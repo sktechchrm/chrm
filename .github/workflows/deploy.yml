@@ -61,7 +61,7 @@ jobs:
 
       # ── 3. Upload dist/ to Pages ───────────────────────────────────────────
       - name: Upload to GitHub Pages
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: dist/
 

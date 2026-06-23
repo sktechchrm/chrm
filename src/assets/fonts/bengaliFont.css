@@ -1,0 +1,19 @@
+/*
+ * Bengali Font Global Config
+ * Location: src/assets/fonts/bengaliFont.css
+ * ─────────────────────────────────────────────────────
+ * Import in main.tsx:
+ *   import './assets/fonts/bengaliFont.css';
+ * ─────────────────────────────────────────────────────
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@300;400;500;600;700&display=swap');
+
+@font-face {
+  font-family: 'Noto Sans Bengali';
+  src: url('https://fonts.gstatic.com/s/notosansbengali/v20/Cn-SJsCGWQxOjaGwMQ6fIiMywrNJIky6nvd8BjzVMvJx2mcSPVFpVEqE-6KmsolKudCk8izI0lc.woff2') format('woff2');
+  unicode-range: U+0980-09FF;
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}

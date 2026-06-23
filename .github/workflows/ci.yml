@@ -1,0 +1,78 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# CI PIPELINE — runs on every push and every pull request.
+#
+# Gates (all must pass before deploy is allowed):
+#   1. Type-check  — tsc --noEmit  (catches type errors without building)
+#   2. Lint        — eslint         (enforces code style rules)
+#   3. Test        — vitest run     (runs all 189 formula unit tests)
+#   4. Build       — vite build     (verifies the production bundle compiles)
+#
+# If any gate fails the workflow stops and the failure is reported on the
+# commit / PR. The deploy workflow only runs after this one succeeds on main.
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: CI
+
+on:
+  push:
+    branches: ["**"]        # every branch
+  pull_request:
+    branches: ["**"]        # every PR
+
+jobs:
+  ci:
+    name: Type-check · Lint · Test · Build
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── 1. Checkout ──────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. Setup Node ────────────────────────────────────────────────────────
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      # ── 3. Install dependencies ───────────────────────────────────────────────
+      - name: Install dependencies
+        run: npm ci
+
+      # ── 4. Type-check ─────────────────────────────────────────────────────────
+      - name: TypeScript type-check
+        run: npx tsc --noEmit
+        # Runs the TypeScript compiler in check-only mode (no output files).
+        # Catches type errors, missing imports, and interface mismatches.
+
+      # ── 5. Lint ───────────────────────────────────────────────────────────────
+      - name: ESLint
+        run: npm run lint
+        # Enforces code style rules defined in eslint.config.js.
+        # Fails the build on any lint error.
+
+      # ── 6. Unit tests ─────────────────────────────────────────────────────────
+      - name: Run unit tests
+        run: npm run test
+        # Runs all Vitest tests (currently 189 tests across 3 files).
+        # Covers all financial formula functions — FinalSettlement, Maternity,
+        # and sharedFormulas.
+
+      # ── 7. Production build ───────────────────────────────────────────────────
+      - name: Build production bundle
+        run: npm run build
+        # Full production build: tsc -b && vite build.
+        # Catches any build-time errors not caught by the type-check step.
+        # Also verifies that code-split chunks generate without errors.
+
+      # ── 8. Upload build artifact (optional — used by deploy workflow) ─────────
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        with:
+          name: dist
+          path: dist/
+          retention-days: 1
+          # Only uploaded on main branch pushes so the deploy job can use it
+          # without rebuilding. Not uploaded on PRs or feature branches.

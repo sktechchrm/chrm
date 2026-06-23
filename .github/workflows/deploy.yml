@@ -1,0 +1,71 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# DEPLOY PIPELINE — runs only after CI passes on the main branch.
+#
+# Flow:
+#   CI pipeline (ci.yml) succeeds on main
+#     → This workflow downloads the pre-built artifact
+#     → Deploys to GitHub Pages
+#
+# This means a broken build can NEVER reach GitHub Pages — the deploy
+# is completely blocked by the CI gate.
+#
+# GitHub Pages setup required (one-time, done in repository Settings):
+#   Settings → Pages → Source → GitHub Actions
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: ["CI"]           # must match the `name:` in ci.yml exactly
+    types: [completed]
+    branches: [main]            # only deploy from main
+
+# Minimal permissions — only what GitHub Pages deployment requires
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Only one deploy at a time. If a new commit is pushed while deploying,
+# cancel the in-progress deploy and start a fresh one.
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy to GitHub Pages
+    runs-on: ubuntu-latest
+
+    # Only deploy if the CI workflow actually succeeded (not cancelled/failed)
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      # ── 1. Download the pre-built dist/ from CI ────────────────────────────
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── 2. Configure GitHub Pages ──────────────────────────────────────────
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      # ── 3. Upload dist/ to Pages ───────────────────────────────────────────
+      - name: Upload to GitHub Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/
+
+      # ── 4. Deploy ─────────────────────────────────────────────────────────
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

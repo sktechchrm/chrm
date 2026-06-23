@@ -1,0 +1,55 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# DEPENDABOT — automatic dependency update pull requests.
+#
+# Dependabot will open a PR each week for any outdated npm package.
+# The PR goes through the same CI pipeline (type-check, lint, test, build)
+# before it can be merged, so broken updates are caught automatically.
+# ─────────────────────────────────────────────────────────────────────────────
+
+version: 2
+
+updates:
+  # npm packages
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Dhaka"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      # Group all React-related updates into one PR
+      react:
+        patterns:
+          - "react"
+          - "react-*"
+          - "@types/react*"
+      # Group all Vite/build tool updates into one PR
+      build-tools:
+        patterns:
+          - "vite"
+          - "@vitejs/*"
+          - "typescript"
+          - "eslint*"
+          - "@eslint/*"
+      # Group all testing library updates into one PR
+      testing:
+        patterns:
+          - "vitest"
+          - "@vitest/*"
+          - "@testing-library/*"
+
+  # GitHub Actions versions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    labels:
+      - "dependencies"
+      - "github-actions"

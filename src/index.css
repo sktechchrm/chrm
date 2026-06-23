@@ -1,0 +1,141 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * src/index.css — Global entry stylesheet
+ * ─────────────────────────────────────────
+ * Import ONCE in main.tsx (in this order):
+ *   import './assets/fonts/bengaliFont.css';
+ *   import './index.css';
+ *
+ * WHY @layer base:
+ *   @tailwind base injects Preflight which resets font-family on html/body.
+ *   Any rules outside @layer run BEFORE Preflight and get overwritten.
+ *   Putting rules inside @layer base makes them run AFTER Preflight —
+ *   so our font-stack and smoothing are never wiped.
+ * ─────────────────────────────────────────
+ */
+
+@layer base {
+
+  /*
+   * ── Global font stack ────────────────────────────────────────
+   *
+   * Unicode-range in bengaliFont.css handles Bengali character
+   * interception automatically. This stack activates it on html
+   * and provides Latin fallbacks.
+   *
+   * font-smoothing + text-rendering:
+   *   Removes subpixel smearing on complex Bengali glyphs.
+   *   Applied on html — inherited by every element.
+   * ────────────────────────────────────────────────────────────
+   */
+  html {
+    font-family:
+      'Noto Sans Bengali',
+      'Segoe UI',
+      system-ui,
+      -apple-system,
+      sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+    -webkit-font-smoothing:  antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering:          optimizeLegibility;
+  }
+
+  body {
+    min-height: 100vh;
+    background-color: #f1f5f9;
+    color: #1e293b;
+  }
+
+  /*
+   * ── Form elements ────────────────────────────────────────────
+   * Browsers block font-family inheritance on these elements.
+   * Tailwind Preflight partially fixes this, but being explicit
+   * ensures smoothing is also applied.
+   * ────────────────────────────────────────────────────────────
+   */
+  input,
+  textarea,
+  select,
+  button,
+  optgroup,
+  option {
+    font-family:             inherit;
+    font-size:               inherit;
+    line-height:             inherit;
+    -webkit-font-smoothing:  antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+}
+
+/* ── Print ── */
+@media print {
+  html {
+    font-family:
+      'Noto Sans Bengali',
+      'Segoe UI',
+      system-ui,
+      sans-serif;
+    -webkit-font-smoothing:  antialiased;
+    text-rendering:          optimizeLegibility;
+    font-size: 12pt;
+  }
+  input,
+  textarea,
+  select,
+  button {
+    font-family: inherit;
+  }
+}
+/* ══════════════════════════════════════════════════════════
+   GLOBAL PRINT RULES — Central source of truth.
+   ══════════════════════════════════════════════════════════ */
+@media print {
+  @page { size: A4 portrait; margin: 14mm 12mm 14mm 12mm; }
+
+  html {
+    font-family: 'Noto Sans Bengali', 'SolaimanLipi', 'Segoe UI', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    font-size: 11pt;
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  body { background: #fff !important; color: #000 !important; min-height: auto; }
+
+  /* Hide UI chrome */
+  .nav-root, .footer-root, .nav-mobile-panel, .eb-toolbar, .eb-btn,
+  [data-no-print], [data-print-hide] { display: none !important; }
+
+  /* No page break INSIDE these elements */
+  tr, td, th, img, figure, blockquote, pre, .avoid-break, .section-block, .card {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Table headers repeat on every page */
+  thead { display: table-header-group; }
+  tfoot { display: table-footer-group; }
+  table { page-break-inside: auto; border-collapse: collapse !important; width: 100% !important; }
+
+  /* Headings stay with their content */
+  h1, h2, h3, h4, h5, h6 { page-break-after: avoid !important; break-after: avoid !important; }
+
+  /* Orphan / widow control */
+  p { orphans: 3; widows: 3; }
+
+  /* Force colour printing */
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+
+  /* Remove screen-only decorations */
+  * { box-shadow: none !important; text-shadow: none !important; }
+  a[href]::after { content: none !important; }
+
+  input, textarea, select, button { font-family: inherit; font-size: inherit; }
+}

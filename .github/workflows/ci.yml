@@ -68,7 +68,7 @@ jobs:
 
       # ── 8. Upload build artifact (optional — used by deploy workflow) ─────────
       - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         with:
           name: dist

@@ -22,8 +22,6 @@ import type { Grievance } from '../shared/types';
 import { FLOW_STEPS, STATUS_COLORS, URGENCY_COLORS } from '../shared/constants';
 import { FaSpinner } from 'react-icons/fa';
 import { useFactory }    from '../../../hooks/useFactory';
-import { PrintSignatureRow } from '../../common/AuthorizationBlock';
-import type { AuthorizationState } from '../../common/AuthorizationBlock';
 import { exportToPDF }   from '../../../utils/pdfExport';
 
 const MONTHS_BN = ['জানুয়ারি','ফেব্রুয়ারি','মার্চ','এপ্রিল','মে','জুন','জুলাই','আগস্ট','সেপ্টেম্বর','অক্টোবর','নভেম্বর','ডিসেম্বর'];
@@ -269,13 +267,12 @@ export interface MonthlyReportRef {
 interface MonthlyReportProps {
   grievances:    Grievance[];
   loading:       boolean;
-  auth:          AuthorizationState;
   lang:          'bn' | 'en';
   onLangChange?: (l: 'bn' | 'en') => void;
 }
 
 const MonthlyReport = forwardRef<MonthlyReportRef, MonthlyReportProps>(
-function MonthlyReport({ grievances, loading, auth, lang, onLangChange }, ref) {
+function MonthlyReport({ grievances, loading, lang, onLangChange }, ref) {
   const factory   = useFactory();
   const t         = T[lang];
   const today     = new Date();
@@ -299,11 +296,8 @@ function MonthlyReport({ grievances, loading, auth, lang, onLangChange }, ref) {
       <style>
         @page{size:A4 portrait;margin:12mm 14mm;}
         body{margin:0;font-family:'Noto Sans Bengali',Arial,sans-serif;color:#000;}
-        /* INK ECONOMY — strip all colored backgrounds, keep only text and borders */
-        [style*="background:#0f2442"],[style*="background: #0f2442"]{background:#fff!important;color:#000!important;border:1.5px solid #000!important;}
-        [style*="background:#f8fafc"],[style*="background:#f1f5f9"]{background:#fff!important;}
         .no-print{display:none!important;}
-        /* SVG donut fills print naturally via fill attr — keep as-is */
+        ${styles}
       </style>
       </head><body>${el.outerHTML}</body></html>`);
     doc.close();
@@ -427,16 +421,31 @@ function MonthlyReport({ grievances, loading, auth, lang, onLangChange }, ref) {
 
           {/* ── COVER ─────────────────────────────────────────────────── */}
           <div style={{ background:'#0f2442', color:'#fff', borderRadius:'10px 10px 0 0', padding:'22px 24px 18px' }}>
-            <div style={{ fontSize:10, letterSpacing:'.08em', opacity:.5, textTransform:'uppercase', marginBottom:10 }}>
-              {factory.nameBn || factory.nameEn} &nbsp;·&nbsp; 
-              {factory.addressEn || factory.addressBn}
-            </div>
-            <div style={{ fontSize:18, fontWeight:700, lineHeight:1.3, marginBottom:4 }}>{t.title}</div>
-            <div style={{ fontSize:11, opacity:.5 }}>
-              {lang==='bn' ? MONTHS_BN[month] : MONTHS_EN[month]} 1–{lastDay}, {year}
+            {/* Left: factory name + address + title | Right: print date */}
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:14 }}>
+              <div>
+                <div style={{ fontSize:15, fontWeight:700, lineHeight:1.3 }}>
+                  {lang==='bn' ? (factory.nameBn || factory.nameEn) : (factory.nameEn || factory.nameBn)}
+                </div>
+                <div style={{ fontSize:11, opacity:.6, marginTop:2 }}>
+                  {lang==='bn' ? (factory.addressBn || factory.addressEn) : (factory.addressEn || factory.addressBn)}
+                </div>
+                <div style={{ fontSize:18, fontWeight:700, lineHeight:1.3, marginTop:10 }}>{t.title}</div>
+                <div style={{ fontSize:11, opacity:.5, marginTop:3 }}>
+                  {lang==='bn' ? MONTHS_BN[month] : MONTHS_EN[month]} 1–{lastDay}, {year}
+                </div>
+              </div>
+              <div style={{ textAlign:'right', flexShrink:0, paddingLeft:16 }}>
+                <div style={{ fontSize:10, opacity:.5, marginBottom:3 }}>
+                  {lang==='bn' ? 'মুদ্রণের তারিখ' : 'Print date'}
+                </div>
+                <div style={{ fontSize:13, fontWeight:600 }}>
+                  {new Date().toLocaleDateString(lang==='bn' ? 'bn-BD' : 'en-GB')}
+                </div>
+              </div>
             </div>
             {/* 4 KPI cells — all real numbers */}
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:1, marginTop:16,
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:1, marginTop:4,
               background:'rgba(255,255,255,.1)', borderRadius:8, overflow:'hidden' }}>
               {[
                 { v: String(total),    l: t.totalFiled },
@@ -444,7 +453,7 @@ function MonthlyReport({ grievances, loading, auth, lang, onLangChange }, ref) {
                 { v: String(pending),  l: t.pending    },
                 { v: String(avgDays),  l: t.avgDays    },
               ].map(({ v, l }) => (
-                <div key={l} style={{ background:'rgba(255,255,255,.1)', padding:'12px 8px', textAlign:'center' }}>
+                <div key={l} style={{ background:'rgba(255,255,255,.08)', padding:'12px 8px', textAlign:'center' }}>
                   <div style={{ fontSize:24, fontWeight:700, color:'#fff' }}>{v}</div>
                   <div style={{ fontSize:10, opacity:.55, marginTop:2 }}>{l}</div>
                 </div>
@@ -452,6 +461,24 @@ function MonthlyReport({ grievances, loading, auth, lang, onLangChange }, ref) {
             </div>
           </div>
           <div style={{ height:3, background:'#0f2442', borderRadius:'0 0 4px 4px', marginBottom:20 }}/>
+
+          {/* KPI strip — bordered cells, no fill */}
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', border:'1px solid #000',
+            borderRadius:6, overflow:'hidden', marginBottom:18 }}>
+            {[
+              { v: String(total),    l: t.totalFiled },
+              { v: String(resolved), l: t.resolved   },
+              { v: String(pending),  l: t.pending    },
+              { v: String(avgDays),  l: t.avgDays    },
+            ].map(({ v, l }, i) => (
+              <div key={l} style={{ padding:'10px 8px', textAlign:'center',
+                borderRight: i < 3 ? '1px solid #000' : 'none',
+                background:'#fff' }}>
+                <div style={{ fontSize:22, fontWeight:700, color:'#0f2442' }}>{v}</div>
+                <div style={{ fontSize:10, color:'#374151', marginTop:2 }}>{l}</div>
+              </div>
+            ))}
+          </div>
 
           {total === 0 ? (
             <div style={{ textAlign:'center', padding:'3rem 2rem', color:'#94a3b8', fontSize:14 }}>
@@ -578,20 +605,12 @@ function MonthlyReport({ grievances, loading, auth, lang, onLangChange }, ref) {
 
           </>)}
 
-          {/* ── S6 AUTHORISATION ────────────────────────────────────── */}
-          <div style={{ marginBottom:12 }}>
-            <SecLabel>{t.s6}</SecLabel>
-            <div style={{ fontSize:12, color:'#64748b', marginBottom:14, lineHeight:1.7 }}>
-              {t.auth} {t.period} {lang==='bn' ? MONTHS_BN[month] : MONTHS_EN[month]} 1–{lastDay}, {year}.
-            </div>
-            <PrintSignatureRow value={auth} lang={lang}/>
-          </div>
+
 
           {/* Footer */}
-          <div style={{ background:'#f8fafc', borderRadius:8, padding:'9px 14px',
-            display:'flex', justifyContent:'space-between', fontSize:10, color:'#94a3b8',
-            borderTop:'1px solid #e2e8f0', marginTop:16 }}>
-            <span>{factory.nameBn || factory.nameEn} &nbsp;·&nbsp; {t.confidential}</span>
+          <div style={{ borderTop:'1px solid #000', marginTop:20, paddingTop:8,
+            display:'flex', justifyContent:'space-between', fontSize:10, color:'#374151' }}>
+            <span>{lang==='bn' ? (factory.nameBn||factory.nameEn) : (factory.nameEn||factory.nameBn)} &nbsp;·&nbsp; {t.confidential}</span>
             <span>RMS V16 &nbsp;·&nbsp; {lang==='bn' ? MONTHS_BN[month] : MONTHS_EN[month]} {year}</span>
           </div>
 

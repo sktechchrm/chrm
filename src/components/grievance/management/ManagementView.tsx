@@ -1,18 +1,6 @@
-/**
- * ManagementView.tsx — ব্যবস্থাপনা প্যানেল
- *
- * Aligned with global module standard:
- * - Receives grievances from parent (GrievanceModule already loaded them
- *   for the সংরক্ষিত রেকর্ড panel) — no duplicate API call.
- * - Receives selectedId to open a specific grievance detail directly
- *   (triggered by record panel click or আপডেট সার্চ result).
- * - Calls onRefresh when a status update succeeds so the parent can
- *   reload the records panel.
- */
-
 import { useState, useEffect } from "react";
 import type { Grievance, UpdateForm, UpdateMsg } from "../shared/types";
-import { FLOW_STEPS, STATUS_COLORS, URGENCY_COLORS } from "../shared/constants";
+import { FLOW_STEPS, STATUS_COLORS } from "../shared/constants";
 import { apiGet, apiPost } from "../shared/api";
 import { S } from "../shared/styles";
 import FlowBoard from "../shared/FlowBoard";
@@ -22,38 +10,29 @@ import {
 } from "react-icons/fa";
 
 interface ManagementViewProps {
-  /** All grievances pre-loaded by GrievanceModule — no separate fetch needed */
   grievances:  Grievance[];
-  /** Loading state from parent */
   loading:     boolean;
-  /** Called after a successful status update so parent refreshes records */
   onRefresh:   () => Promise<void>;
-  /** When set, open this GRV ID's detail immediately */
   selectedId?: string;
 }
 
 export default function ManagementView({
   grievances, loading, onRefresh, selectedId,
 }: ManagementViewProps) {
-  const [selected,    setSelected]    = useState<Grievance | null>(null);
-  const [updating,    setUpdating]    = useState(false);
-  const [updateForm,  setUpdateForm]  = useState<UpdateForm>({ status: "", note: "", by: "" });
-  const [updateMsg,   setUpdateMsg]   = useState<UpdateMsg | null>(null);
-  const [filter,      setFilter]      = useState("সব");
-  const [search,      setSearch]      = useState("");
+  const [selected,   setSelected]   = useState<Grievance | null>(null);
+  const [updating,   setUpdating]   = useState(false);
+  const [updateForm, setUpdateForm] = useState<UpdateForm>({ status: "", note: "", by: "" });
+  const [updateMsg,  setUpdateMsg]  = useState<UpdateMsg | null>(null);
+  const [filter,     setFilter]     = useState("সব");
+  const [search,     setSearch]     = useState("");
 
-  // When a record is clicked in the right panel, open its detail directly
   useEffect(() => {
     if (!selectedId) return;
     const found = grievances.find(g => g.ID === selectedId);
-    if (found) {
-      openDetail(found);
-    } else {
-      // Not yet in the list — fetch individually
-      apiGet({ action: "getOne", id: selectedId }).then(res => {
-        if (res.success && res.data) openDetail(res.data as Grievance);
-      });
-    }
+    if (found) { openDetail(found); return; }
+    apiGet({ action: "getOne", id: selectedId }).then(res => {
+      if (res.success && res.data) openDetail(res.data as Grievance);
+    });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId]);
 
@@ -65,17 +44,14 @@ export default function ManagementView({
 
   const submitUpdate = async () => {
     if (!updateForm.status || !updateForm.note) {
-      setUpdateMsg({ type: "error", text: "স্ট্যাটাস এবং মন্তব্য আবশ্যক।" });
-      return;
+      setUpdateMsg({ type: "error", text: "স্ট্যাটাস এবং মন্তব্য আবশ্যক।" }); return;
     }
-    setUpdating(true);
-    setUpdateMsg(null);
+    setUpdating(true); setUpdateMsg(null);
     try {
       const res = await apiPost({ action: "update", id: selected!.ID, ...updateForm });
       if (res.success) {
         setUpdateMsg({ type: "success", text: "সফলভাবে আপডেট হয়েছে।" });
         await onRefresh();
-        // Reload the selected grievance to show updated history
         const updated = await apiGet({ action: "getOne", id: selected!.ID });
         if (updated.success) setSelected(updated.data as Grievance);
       } else {
@@ -88,7 +64,6 @@ export default function ManagementView({
   };
 
   const ALL_FILTERS = ["সব", ...FLOW_STEPS.map(s => s.status)];
-
   const filtered = grievances.filter(g => {
     const mf = filter === "সব" || g.Status === filter;
     const ms = !search
@@ -97,10 +72,8 @@ export default function ManagementView({
       || g.Department?.toLowerCase().includes(search.toLowerCase());
     return mf && ms;
   });
-
   const counts = FLOW_STEPS.reduce<Record<string, number>>((a, s) => {
-    a[s.status] = grievances.filter(g => g.Status === s.status).length;
-    return a;
+    a[s.status] = grievances.filter(g => g.Status === s.status).length; return a;
   }, {});
 
   return (
@@ -113,15 +86,23 @@ export default function ManagementView({
         </h2>
       </div>
 
-      {/* Stats */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(90px, 1fr))", gap: 8, marginBottom: "1.25rem" }}>
+      {/* Stats — clickable filter pills */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))", gap: 8, marginBottom: "1.25rem" }}>
         {[
           { label: "মোট", val: grievances.length, color: "#1a1a18" },
           ...FLOW_STEPS.map(s => ({ label: s.label, val: counts[s.status] || 0, color: s.color })),
         ].map(s => (
-          <div key={s.label} style={{ background: "#fff", borderRadius: 10, border: "0.5px solid #E8E7E3", padding: "10px 12px", textAlign: "center" }}>
-            <div style={{ fontSize: 20, fontWeight: 700, color: s.color }}>{s.val}</div>
-            <div style={{ fontSize: 10, color: "#888780", marginTop: 2 }}>{s.label}</div>
+          <div key={s.label}
+            onClick={() => setFilter(filter === s.label ? "সব" : s.label === "মোট" ? "সব" : s.label)}
+            style={{
+              background: (s.label === "মোট" ? filter === "সব" : filter === s.label) ? s.color : "#fff",
+              color:      (s.label === "মোট" ? filter === "সব" : filter === s.label) ? "#fff" : s.color,
+              borderRadius: 10, border: `1px solid ${s.color}`,
+              padding: "10px 12px", textAlign: "center", cursor: "pointer",
+              transition: "all .15s",
+            }}>
+            <div style={{ fontSize: 20, fontWeight: 700 }}>{s.val}</div>
+            <div style={{ fontSize: 10, marginTop: 2, opacity: .8 }}>{s.label}</div>
           </div>
         ))}
       </div>
@@ -131,12 +112,14 @@ export default function ManagementView({
         <input
           style={{ ...S.input, flex: 1, minWidth: 160 }}
           placeholder="আইডি, নাম বা বিভাগ দিয়ে খুঁজুন…"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
+          value={search} onChange={e => setSearch(e.target.value)}
         />
-        <select style={{ ...S.select, minWidth: 150, width: "auto" }} value={filter} onChange={e => setFilter(e.target.value)}>
-          {ALL_FILTERS.map(f => <option key={f}>{f}</option>)}
-        </select>
+        {filter !== "সব" && (
+          <button onClick={() => setFilter("সব")}
+            style={{ ...S.btnSecondary, fontSize: 12, display: "flex", alignItems: "center", gap: 5 }}>
+            <FaTimes style={{ fontSize: 11 }}/> ফিল্টার বাতিল
+          </button>
+        )}
       </div>
 
       {/* List */}
@@ -154,15 +137,22 @@ export default function ManagementView({
             </div>
           )}
           {filtered.map(g => (
-            <div
-              key={g.ID}
-              style={{ ...S.card, cursor: "pointer", borderLeft: `3px solid ${STATUS_COLORS[g.Status] || "#D3D1C7"}`, padding: "0.9rem 1.1rem" }}
-              onClick={() => openDetail(g)}
-            >
+            <div key={g.ID}
+              style={{ ...S.card, cursor: "pointer",
+                borderLeft: `4px solid ${STATUS_COLORS[g.Status] || "#D3D1C7"}`,
+                padding: "0.9rem 1.1rem",
+                background: selected?.ID === g.ID ? (STATUS_COLORS[g.Status]||"#e2e8f0")+"0d" : "#fff",
+                border: selected?.ID === g.ID ? `1.5px solid ${STATUS_COLORS[g.Status]||"#e2e8f0"}` : undefined,
+              }}
+              onClick={() => openDetail(g)}>
               <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a18", marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{g.ID}</div>
-                  <div style={{ fontSize: 13, color: "#444441" }}>{g.EmployeeID === "ANON" ? "বেনামী কর্মী" : g.Name} · {g.Department}</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a18", marginBottom: 2,
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{g.ID}</div>
+                  <div style={{ fontSize: 13, color: "#444441" }}>
+                    {g.EmployeeID === "ANON" ? "বেনামী কর্মী" : g.Name}
+                    {g.Department && ` · ${g.Department}`}
+                  </div>
                   <div style={{ fontSize: 11, color: "#888780", marginTop: 2 }}>{g.Category}</div>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 }}>
@@ -174,7 +164,8 @@ export default function ManagementView({
                 </div>
               </div>
               {g.Description && (
-                <div style={{ fontSize: 12, color: "#5F5E5A", marginTop: 6, lineHeight: 1.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <div style={{ fontSize: 12, color: "#5F5E5A", marginTop: 6, lineHeight: 1.5,
+                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {g.Description}
                 </div>
               )}
@@ -185,37 +176,31 @@ export default function ManagementView({
 
       {/* Detail modal */}
       {selected && (
-        <div
-          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000,
-            display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}
-          onClick={e => { if (e.target === e.currentTarget) setSelected(null); }}
-        >
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000,
+          display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}
+          onClick={e => { if (e.target === e.currentTarget) setSelected(null); }}>
           <div style={{ background: "#fff", borderRadius: 14, width: "100%", maxWidth: 680,
             maxHeight: "90vh", overflowY: "auto", padding: "1.5rem",
             boxShadow: "0 20px 60px rgba(0,0,0,0.15)" }}>
 
-            {/* Modal header */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.25rem" }}>
               <div>
-                <div style={{ fontSize: 11, color: "#888780", marginBottom: 2, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>অভিযোগের বিস্তারিত</div>
+                <div style={{ fontSize: 11, color: "#888780", marginBottom: 2, fontWeight: 600,
+                  textTransform: "uppercase", letterSpacing: "0.05em" }}>অভিযোগের বিস্তারিত</div>
                 <div style={{ fontSize: 17, fontWeight: 700, color: "#0f2442" }}>{selected.ID}</div>
               </div>
-              <button
-                style={{ ...S.btnSecondary, padding: "7px 11px" }}
-                onClick={() => setSelected(null)}
-                aria-label="বন্ধ করুন"
-              >
+              <button style={{ ...S.btnSecondary, padding: "7px 11px" }}
+                onClick={() => setSelected(null)} aria-label="বন্ধ করুন">
                 <FaTimes style={{ fontSize: 15 }} />
               </button>
             </div>
 
-            {/* Info grid */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: "1.25rem" }}>
               {[
-                { label: "কর্মী",          val: selected.EmployeeID === "ANON" ? "বেনামী কর্মী" : `${selected.Name} (${selected.EmployeeID})` },
-                { label: "বিভাগ",          val: selected.Department },
+                { label: "কর্মী",         val: selected.EmployeeID === "ANON" ? "বেনামী কর্মী" : `${selected.Name} (${selected.EmployeeID})` },
+                { label: "বিভাগ",         val: selected.Department },
                 { label: "অভিযোগের ধরন", val: selected.Category },
-                { label: "জরুরিত্ব",       val: selected.Urgency },
+                { label: "জরুরিত্ব",      val: selected.Urgency },
               ].map(d => (
                 <div key={d.label} style={{ background: "#f8fafc", borderRadius: 8, padding: "9px 11px" }}>
                   <div style={{ fontSize: 10, color: "#888780", marginBottom: 2 }}>{d.label}</div>
@@ -224,7 +209,6 @@ export default function ManagementView({
               ))}
             </div>
 
-            {/* Urgency + Status badges */}
             <div style={{ display: "flex", gap: 6, marginBottom: "1rem", flexWrap: "wrap" }}>
               <span style={S.urgencyBadge(selected.Urgency)}>{selected.Urgency}</span>
               <span style={S.badge(selected.Status)}>{selected.Status}</span>
@@ -235,20 +219,17 @@ export default function ManagementView({
               )}
             </div>
 
-            {/* Description */}
             <div style={{ background: "#f8fafc", borderRadius: 8, padding: "11px 13px", marginBottom: "1.25rem" }}>
-              <div style={{ fontSize: 10, color: "#888780", marginBottom: 5, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase" }}>বিবরণ</div>
+              <div style={{ fontSize: 10, color: "#888780", marginBottom: 5, fontWeight: 700,
+                letterSpacing: "0.05em", textTransform: "uppercase" }}>বিবরণ</div>
               <div style={{ fontSize: 13, lineHeight: 1.7, color: "#1e293b" }}>{selected.Description}</div>
             </div>
 
-            {/* Flow board */}
             <FlowBoard grievance={selected} />
 
-            {/* Status update */}
             <div style={{ borderTop: "1px solid #e2e8f0", marginTop: "1.25rem", paddingTop: "1.25rem" }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "#374151", marginBottom: "0.75rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                স্ট্যাটাস আপডেট করুন
-              </div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#374151", marginBottom: "0.75rem",
+                textTransform: "uppercase", letterSpacing: "0.05em" }}>স্ট্যাটাস আপডেট করুন</div>
 
               {updateMsg && (
                 <div style={updateMsg.type === "success" ? S.alertSuccess : S.alertError}>
@@ -293,7 +274,6 @@ export default function ManagementView({
           </div>
         </div>
       )}
-
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
   );

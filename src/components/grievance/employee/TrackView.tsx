@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { Grievance } from "../shared/types";
 import { apiGet } from "../shared/api";
 import { S } from "../shared/styles";
@@ -15,20 +15,26 @@ import {
   FaCalendarAlt,
 } from "react-icons/fa";
 
-// --- অগ্রগতি ট্র্যাক (মোবাইল) ---
-export default function TrackView() {
+// --- অগ্রগতি ট্র্যাক ---
+interface TrackViewProps {
+  /** Pre-load this GRV ID when the user clicks a record in the right panel */
+  initialId?: string;
+}
+
+export default function TrackView({ initialId }: TrackViewProps) {
   const [query, setQuery] = useState<string>("");
   const [grievance, setGrievance] = useState<Grievance | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  const search = async (): Promise<void> => {
-    if (!query.trim()) { setError("একটি অভিযোগ আইডি প্রবেশ করুন।"); return; }
+  const search = async (id?: string): Promise<void> => {
+    const searchId = (id ?? query).trim();
+    if (!searchId) { setError("একটি অভিযোগ আইডি প্রবেশ করুন।"); return; }
     setLoading(true);
     setError(null);
     setGrievance(null);
     try {
-      const res = await apiGet({ action: "getOne", id: query.trim() });
+      const res = await apiGet({ action: "getOne", id: searchId });
       if (res.success) setGrievance(res.data as Grievance);
       else setError("অভিযোগ পাওয়া যায়নি। আইডিটি পুনরায় যাচাই করুন।");
     } catch {
@@ -36,6 +42,15 @@ export default function TrackView() {
     }
     setLoading(false);
   };
+
+  // Auto-search when initialId is injected (e.g. from record panel click)
+  useEffect(() => {
+    if (initialId) {
+      setQuery(initialId);
+      search(initialId);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialId]);
 
   const isAnon = (grievance as Grievance & { IsAnonymous?: string })?.IsAnonymous === "YES";
 
@@ -68,7 +83,7 @@ export default function TrackView() {
           />
         </div>
         <div style={{ marginTop: 12 }}>
-          <button style={S.btnPrimary} onClick={search} disabled={loading}>
+          <button style={S.btnPrimary} onClick={() => search()} disabled={loading}>
             {loading
               ? <><FaSpinner style={{ fontSize: 18, animation: "spin 1s linear infinite" }} /> খোঁজা হচ্ছে…</>
               : <><FaSearch style={{ fontSize: 18 }} /> অগ্রগতি দেখুন</>

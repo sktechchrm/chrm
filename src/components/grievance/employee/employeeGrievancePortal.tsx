@@ -195,7 +195,7 @@ export default function GrievanceModule() {
       <main style={S.body}>
         {view === "submit" && <SubmitView />}
         {view === "track" && <TrackView />}
-        {view === "management" && <ManagementView />}
+        {view === "management" && <ManagementView grievances={[]} loading={false} onRefresh={async () => {}} />}
       </main>
     </div>
   );

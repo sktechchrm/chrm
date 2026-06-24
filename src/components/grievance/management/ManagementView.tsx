@@ -1,54 +1,69 @@
-import { useState, useEffect, useCallback } from "react";
+/**
+ * ManagementView.tsx — ব্যবস্থাপনা প্যানেল
+ *
+ * Aligned with global module standard:
+ * - Receives grievances from parent (GrievanceModule already loaded them
+ *   for the সংরক্ষিত রেকর্ড panel) — no duplicate API call.
+ * - Receives selectedId to open a specific grievance detail directly
+ *   (triggered by record panel click or আপডেট সার্চ result).
+ * - Calls onRefresh when a status update succeeds so the parent can
+ *   reload the records panel.
+ */
+
+import { useState, useEffect } from "react";
 import type { Grievance, UpdateForm, UpdateMsg } from "../shared/types";
-import { FLOW_STEPS, STATUS_COLORS } from "../shared/constants";
+import { FLOW_STEPS, STATUS_COLORS, URGENCY_COLORS } from "../shared/constants";
 import { apiGet, apiPost } from "../shared/api";
 import { S } from "../shared/styles";
 import FlowBoard from "../shared/FlowBoard";
 import {
-  FaThLarge,
-  FaSyncAlt,
-  FaSpinner,
-  FaInbox,
-  FaExclamationCircle,
-  FaCheckCircle,
-  FaTimes,
-  FaSave,
+  FaThLarge, FaSpinner, FaInbox, FaExclamationCircle,
+  FaCheckCircle, FaTimes, FaSave,
 } from "react-icons/fa";
 
-// --- ব্যবস্থাপনা প্যানেল ---
-export default function ManagementView() {
-  const [grievances, setGrievances] = useState<Grievance[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-  const [selected, setSelected] = useState<Grievance | null>(null);
-  const [updating, setUpdating] = useState<boolean>(false);
-  const [updateForm, setUpdateForm] = useState<UpdateForm>({ status: "", note: "", by: "" });
-  const [updateMsg, setUpdateMsg] = useState<UpdateMsg | null>(null);
-  const [filter, setFilter] = useState<string>("সব");
-  const [search, setSearch] = useState<string>("");
+interface ManagementViewProps {
+  /** All grievances pre-loaded by GrievanceModule — no separate fetch needed */
+  grievances:  Grievance[];
+  /** Loading state from parent */
+  loading:     boolean;
+  /** Called after a successful status update so parent refreshes records */
+  onRefresh:   () => Promise<void>;
+  /** When set, open this GRV ID's detail immediately */
+  selectedId?: string;
+}
 
-  const load = useCallback(async (): Promise<void> => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await apiGet({ action: "getAll" });
-      if (res.success) setGrievances((res.data as Grievance[]).reverse());
-      else setError("অভিযোগ লোড করতে ব্যর্থ হয়েছে।");
-    } catch {
-      setError("নেটওয়ার্ক ত্রুটি। Apps Script URL যাচাই করুন।");
+export default function ManagementView({
+  grievances, loading, onRefresh, selectedId,
+}: ManagementViewProps) {
+  const [selected,    setSelected]    = useState<Grievance | null>(null);
+  const [updating,    setUpdating]    = useState(false);
+  const [updateForm,  setUpdateForm]  = useState<UpdateForm>({ status: "", note: "", by: "" });
+  const [updateMsg,   setUpdateMsg]   = useState<UpdateMsg | null>(null);
+  const [filter,      setFilter]      = useState("সব");
+  const [search,      setSearch]      = useState("");
+
+  // When a record is clicked in the right panel, open its detail directly
+  useEffect(() => {
+    if (!selectedId) return;
+    const found = grievances.find(g => g.ID === selectedId);
+    if (found) {
+      openDetail(found);
+    } else {
+      // Not yet in the list — fetch individually
+      apiGet({ action: "getOne", id: selectedId }).then(res => {
+        if (res.success && res.data) openDetail(res.data as Grievance);
+      });
     }
-    setLoading(false);
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId]);
 
-  useEffect(() => { load(); }, [load]);
-
-  const openDetail = (g: Grievance): void => {
+  const openDetail = (g: Grievance) => {
     setSelected(g);
     setUpdateForm({ status: g.Status, note: "", by: "" });
     setUpdateMsg(null);
   };
 
-  const submitUpdate = async (): Promise<void> => {
+  const submitUpdate = async () => {
     if (!updateForm.status || !updateForm.note) {
       setUpdateMsg({ type: "error", text: "স্ট্যাটাস এবং মন্তব্য আবশ্যক।" });
       return;
@@ -59,7 +74,8 @@ export default function ManagementView() {
       const res = await apiPost({ action: "update", id: selected!.ID, ...updateForm });
       if (res.success) {
         setUpdateMsg({ type: "success", text: "সফলভাবে আপডেট হয়েছে।" });
-        await load();
+        await onRefresh();
+        // Reload the selected grievance to show updated history
         const updated = await apiGet({ action: "getOne", id: selected!.ID });
         if (updated.success) setSelected(updated.data as Grievance);
       } else {
@@ -71,7 +87,7 @@ export default function ManagementView() {
     setUpdating(false);
   };
 
-  const ALL_FILTERS: string[] = ["সব", ...FLOW_STEPS.map(s => s.status)];
+  const ALL_FILTERS = ["সব", ...FLOW_STEPS.map(s => s.status)];
 
   const filtered = grievances.filter(g => {
     const mf = filter === "সব" || g.Status === filter;
@@ -89,86 +105,76 @@ export default function ManagementView() {
 
   return (
     <div>
-      {/* হেডার */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
+      {/* Header */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>
         <h2 style={{ ...S.sectionTitle, margin: 0 }}>
-          <FaThLarge style={{ fontSize: 22, color: "#7F77DD" }} />
+          <FaThLarge style={{ fontSize: 20, color: "#7F77DD" }} />
           ব্যবস্থাপনা প্যানেল
         </h2>
-        <button style={S.btnSecondary} onClick={load}>
-          <FaSyncAlt style={{ fontSize: 14 }} /> রিফ্রেশ
-        </button>
       </div>
 
-      {/* পরিসংখ্যান */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))", gap: 10, marginBottom: "1.25rem" }}>
+      {/* Stats */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(90px, 1fr))", gap: 8, marginBottom: "1.25rem" }}>
         {[
           { label: "মোট", val: grievances.length, color: "#1a1a18" },
           ...FLOW_STEPS.map(s => ({ label: s.label, val: counts[s.status] || 0, color: s.color })),
         ].map(s => (
-          <div key={s.label} style={{ background: "#fff", borderRadius: 10, border: "0.5px solid #E8E7E3", padding: "12px 14px", textAlign: "center" }}>
-            <div style={{ fontSize: 22, fontWeight: 700, color: s.color }}>{s.val}</div>
-            <div style={{ fontSize: 11, color: "#888780", marginTop: 2 }}>{s.label}</div>
+          <div key={s.label} style={{ background: "#fff", borderRadius: 10, border: "0.5px solid #E8E7E3", padding: "10px 12px", textAlign: "center" }}>
+            <div style={{ fontSize: 20, fontWeight: 700, color: s.color }}>{s.val}</div>
+            <div style={{ fontSize: 10, color: "#888780", marginTop: 2 }}>{s.label}</div>
           </div>
         ))}
       </div>
 
-      {/* ফিল্টার ও সার্চ */}
+      {/* Filter + Search */}
       <div style={{ display: "flex", gap: 10, marginBottom: "1rem", flexWrap: "wrap" }}>
         <input
-          style={{ ...S.input, flex: 1, minWidth: 180 }}
+          style={{ ...S.input, flex: 1, minWidth: 160 }}
           placeholder="আইডি, নাম বা বিভাগ দিয়ে খুঁজুন…"
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
-        <select style={{ ...S.select, minWidth: 160 }} value={filter} onChange={e => setFilter(e.target.value)}>
+        <select style={{ ...S.select, minWidth: 150, width: "auto" }} value={filter} onChange={e => setFilter(e.target.value)}>
           {ALL_FILTERS.map(f => <option key={f}>{f}</option>)}
         </select>
       </div>
 
-      {error && (
-        <div style={S.alertError}>
-          <FaExclamationCircle style={{ fontSize: 18, flexShrink: 0 }} />
-          {error}
-        </div>
-      )}
-
-      {/* তালিকা */}
+      {/* List */}
       {loading ? (
         <div style={{ textAlign: "center", padding: "3rem", color: "#888780" }}>
-          <FaSpinner style={{ fontSize: 32, animation: "spin 1s linear infinite" }} />
-          <div style={{ marginTop: 8, fontSize: 14 }}>অভিযোগ লোড হচ্ছে…</div>
+          <FaSpinner style={{ fontSize: 28, animation: "spin 1s linear infinite" }} />
+          <div style={{ marginTop: 8, fontSize: 13 }}>অভিযোগ লোড হচ্ছে…</div>
         </div>
       ) : (
-        <div style={{ display: "grid", gap: 10 }}>
+        <div style={{ display: "grid", gap: 8 }}>
           {filtered.length === 0 && (
-            <div style={{ ...S.card, textAlign: "center", color: "#888780", padding: "3rem" }}>
-              <FaInbox style={{ fontSize: 36 }} />
-              <div style={{ marginTop: 8 }}>কোনো অভিযোগ পাওয়া যায়নি।</div>
+            <div style={{ ...S.card, textAlign: "center", color: "#888780", padding: "2.5rem" }}>
+              <FaInbox style={{ fontSize: 32 }} />
+              <div style={{ marginTop: 8, fontSize: 13 }}>কোনো অভিযোগ পাওয়া যায়নি।</div>
             </div>
           )}
           {filtered.map(g => (
             <div
               key={g.ID}
-              style={{ ...S.card, cursor: "pointer", borderLeft: `3px solid ${STATUS_COLORS[g.Status] || "#D3D1C7"}`, padding: "1.1rem 1.25rem" }}
+              style={{ ...S.card, cursor: "pointer", borderLeft: `3px solid ${STATUS_COLORS[g.Status] || "#D3D1C7"}`, padding: "0.9rem 1.1rem" }}
               onClick={() => openDetail(g)}
             >
               <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a18", marginBottom: 2 }}>{g.ID}</div>
-                  <div style={{ fontSize: 14, color: "#444441" }}>{g.EmployeeID === "ANON" ? "বেনামী কর্মী" : g.Name} · {g.Department}</div>
-                  <div style={{ fontSize: 12, color: "#888780", marginTop: 2 }}>{g.Category}</div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a18", marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{g.ID}</div>
+                  <div style={{ fontSize: 13, color: "#444441" }}>{g.EmployeeID === "ANON" ? "বেনামী কর্মী" : g.Name} · {g.Department}</div>
+                  <div style={{ fontSize: 11, color: "#888780", marginTop: 2 }}>{g.Category}</div>
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 }}>
                   <span style={S.badge(g.Status)}>{g.Status}</span>
                   <span style={S.urgencyBadge(g.Urgency)}>{g.Urgency}</span>
-                  <span style={{ fontSize: 11, color: "#888780" }}>
+                  <span style={{ fontSize: 10, color: "#888780" }}>
                     {g.SubmittedAt ? new Date(g.SubmittedAt).toLocaleDateString("bn-BD") : ""}
                   </span>
                 </div>
               </div>
               {g.Description && (
-                <div style={{ fontSize: 13, color: "#5F5E5A", marginTop: 8, lineHeight: 1.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <div style={{ fontSize: 12, color: "#5F5E5A", marginTop: 6, lineHeight: 1.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {g.Description}
                 </div>
               )}
@@ -177,101 +183,110 @@ export default function ManagementView() {
         </div>
       )}
 
-      {/* বিস্তারিত মডাল */}
+      {/* Detail modal */}
       {selected && (
         <div
-          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}
-          onClick={(e) => { if (e.target === e.currentTarget) setSelected(null); }}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000,
+            display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}
+          onClick={e => { if (e.target === e.currentTarget) setSelected(null); }}
         >
-          <div style={{ background: "#fff", borderRadius: 16, width: "100%", maxWidth: 720, maxHeight: "90vh", overflowY: "auto", padding: "1.5rem", boxShadow: "0 20px 60px rgba(0,0,0,0.15)" }}>
+          <div style={{ background: "#fff", borderRadius: 14, width: "100%", maxWidth: 680,
+            maxHeight: "90vh", overflowY: "auto", padding: "1.5rem",
+            boxShadow: "0 20px 60px rgba(0,0,0,0.15)" }}>
+
+            {/* Modal header */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.25rem" }}>
               <div>
-                <div style={{ fontSize: 12, color: "#888780", marginBottom: 2, fontWeight: 600 }}>অভিযোগের বিস্তারিত</div>
-                <div style={{ fontSize: 18, fontWeight: 700 }}>{selected.ID}</div>
+                <div style={{ fontSize: 11, color: "#888780", marginBottom: 2, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>অভিযোগের বিস্তারিত</div>
+                <div style={{ fontSize: 17, fontWeight: 700, color: "#0f2442" }}>{selected.ID}</div>
               </div>
-              {/* Fixed close button — icon only, no redundant text */}
               <button
-                style={{ ...S.btnSecondary, padding: "8px 12px", lineHeight: 1 }}
+                style={{ ...S.btnSecondary, padding: "7px 11px" }}
                 onClick={() => setSelected(null)}
                 aria-label="বন্ধ করুন"
               >
-                <FaTimes style={{ fontSize: 16 }} />
+                <FaTimes style={{ fontSize: 15 }} />
               </button>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: "1.25rem" }}>
+            {/* Info grid */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: "1.25rem" }}>
               {[
                 { label: "কর্মী",          val: selected.EmployeeID === "ANON" ? "বেনামী কর্মী" : `${selected.Name} (${selected.EmployeeID})` },
                 { label: "বিভাগ",          val: selected.Department },
                 { label: "অভিযোগের ধরন", val: selected.Category },
                 { label: "জরুরিত্ব",       val: selected.Urgency },
               ].map(d => (
-                <div key={d.label} style={{ background: "#F7F6F2", borderRadius: 8, padding: "10px 12px" }}>
-                  <div style={{ fontSize: 11, color: "#888780", marginBottom: 2 }}>{d.label}</div>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>{d.val}</div>
+                <div key={d.label} style={{ background: "#f8fafc", borderRadius: 8, padding: "9px 11px" }}>
+                  <div style={{ fontSize: 10, color: "#888780", marginBottom: 2 }}>{d.label}</div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: "#1e293b" }}>{d.val}</div>
                 </div>
               ))}
             </div>
 
-            <div style={{ background: "#F7F6F2", borderRadius: 8, padding: "12px 14px", marginBottom: "1.25rem" }}>
-              <div style={{ fontSize: 11, color: "#888780", marginBottom: 6, fontWeight: 700, letterSpacing: "0.04em" }}>বিবরণ</div>
-              <div style={{ fontSize: 14, lineHeight: 1.7 }}>{selected.Description}</div>
+            {/* Urgency + Status badges */}
+            <div style={{ display: "flex", gap: 6, marginBottom: "1rem", flexWrap: "wrap" }}>
+              <span style={S.urgencyBadge(selected.Urgency)}>{selected.Urgency}</span>
+              <span style={S.badge(selected.Status)}>{selected.Status}</span>
+              {selected.SubmittedAt && (
+                <span style={{ fontSize: 11, color: "#94a3b8", alignSelf: "center" }}>
+                  {new Date(selected.SubmittedAt).toLocaleDateString("bn-BD")}
+                </span>
+              )}
             </div>
 
+            {/* Description */}
+            <div style={{ background: "#f8fafc", borderRadius: 8, padding: "11px 13px", marginBottom: "1.25rem" }}>
+              <div style={{ fontSize: 10, color: "#888780", marginBottom: 5, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase" }}>বিবরণ</div>
+              <div style={{ fontSize: 13, lineHeight: 1.7, color: "#1e293b" }}>{selected.Description}</div>
+            </div>
+
+            {/* Flow board */}
             <FlowBoard grievance={selected} />
 
-            {/* স্ট্যাটাস আপডেট */}
-            <div style={{ borderTop: "0.5px solid #E8E7E3", marginTop: "1.25rem", paddingTop: "1.25rem" }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: "#444441", marginBottom: "0.75rem", letterSpacing: "0.04em" }}>
+            {/* Status update */}
+            <div style={{ borderTop: "1px solid #e2e8f0", marginTop: "1.25rem", paddingTop: "1.25rem" }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#374151", marginBottom: "0.75rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>
                 স্ট্যাটাস আপডেট করুন
               </div>
 
               {updateMsg && (
                 <div style={updateMsg.type === "success" ? S.alertSuccess : S.alertError}>
                   {updateMsg.type === "success"
-                    ? <FaCheckCircle style={{ fontSize: 16, flexShrink: 0 }} />
-                    : <FaExclamationCircle style={{ fontSize: 16, flexShrink: 0 }} />
-                  }
-                  {updateMsg.text}
+                    ? <FaCheckCircle style={{ fontSize: 15, flexShrink: 0 }} />
+                    : <FaExclamationCircle style={{ fontSize: 15, flexShrink: 0 }} />}
+                  <span style={{ fontSize: 13 }}>{updateMsg.text}</span>
                 </div>
               )}
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
                 <div style={S.formGroup}>
                   <label style={S.label}>নতুন স্ট্যাটাস *</label>
-                  <select style={S.select} value={updateForm.status} onChange={e => setUpdateForm(f => ({ ...f, status: e.target.value }))}>
+                  <select style={S.select} value={updateForm.status}
+                    onChange={e => setUpdateForm(f => ({ ...f, status: e.target.value }))}>
                     {FLOW_STEPS.map(s => <option key={s.status}>{s.status}</option>)}
                   </select>
                 </div>
                 <div style={S.formGroup}>
                   <label style={S.label}>আপডেটকারীর নাম</label>
-                  <input
-                    style={S.input}
-                    value={updateForm.by}
+                  <input style={S.input} value={updateForm.by}
                     onChange={e => setUpdateForm(f => ({ ...f, by: e.target.value }))}
-                    placeholder="নাম / পদবি"
-                  />
+                    placeholder="নাম / পদবি" />
                 </div>
                 <div style={{ ...S.formGroup, gridColumn: "1 / -1" }}>
                   <label style={S.label}>গৃহীত পদক্ষেপ / মন্তব্য *</label>
-                  <textarea
-                    style={S.textarea}
-                    value={updateForm.note}
+                  <textarea style={S.textarea} value={updateForm.note}
                     onChange={e => setUpdateForm(f => ({ ...f, note: e.target.value }))}
-                    placeholder="ব্যবস্থাপনার পক্ষ থেকে গৃহীত পদক্ষেপ বা উদ্যোগের বিবরণ লিখুন…"
-                  />
+                    placeholder="ব্যবস্থাপনার পক্ষ থেকে গৃহীত পদক্ষেপের বিবরণ লিখুন…" />
                 </div>
               </div>
 
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
-                <button style={S.btnSecondary} onClick={() => setSelected(null)}>
-                  বাতিল
-                </button>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                <button style={S.btnSecondary} onClick={() => setSelected(null)}>বাতিল</button>
                 <button style={S.btnPrimary} onClick={submitUpdate} disabled={updating}>
                   {updating
-                    ? <><FaSpinner style={{ fontSize: 15, animation: "spin 1s linear infinite" }} /> সংরক্ষণ হচ্ছে…</>
-                    : <><FaSave style={{ fontSize: 15 }} /> সংরক্ষণ করুন</>
-                  }
+                    ? <><FaSpinner style={{ fontSize: 13, animation: "spin 1s linear infinite" }} /> সংরক্ষণ হচ্ছে…</>
+                    : <><FaSave style={{ fontSize: 13 }} /> সংরক্ষণ করুন</>}
                 </button>
               </div>
             </div>
@@ -279,9 +294,7 @@ export default function ManagementView() {
         </div>
       )}
 
-      <style>{`
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-      `}</style>
+      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }

@@ -59,12 +59,19 @@ export interface ShellProps {
   onCancelEdit?:  () => void;
   onReset?:       () => void;
   onUpdate?:      (record: Record<string, unknown>) => void;
+  /** Override the built-in UpdateModal — if provided, clicking আপডেট সার্চ calls this
+   *  instead of opening the DataUseCases modal. Use for modules with their own search. */
+  onUpdateSearch?: () => void;
   updateModule?:  DbModule;
   updateLabel?:   string;
   /** Placeholder text for the update-search input — defaults to "কার্ড নং বা নাম..." */
   updateSearchPlaceholder?: string;
 
   children:       React.ReactNode;
+
+  /** Hide the ← পূর্ববর্তী / পরবর্তী → footer nav — for tab-style modules where steps
+   *  are independent views, not a sequential flow (e.g. grievance). */
+  hideStepNav?:   boolean;
 
   calcRows?:      CalcRow[];
   totalRow?:      CalcRow;
@@ -74,6 +81,10 @@ export interface ShellProps {
   onLoadRecord?:  (rec: Record<string, unknown>) => void;
   onDeleteRecord?:(id: string) => Promise<boolean>;
   onReload?:      () => void;
+  /** Optional badge rendered next to each record row — e.g. urgency badge for grievance */
+  recordBadge?:   (rec: DbRecord) => React.ReactNode;
+  /** Optional label override per record — defaults to employeeName/fullName/subject/id */
+  recordLabel?:   (rec: DbRecord) => string;
 
   auth?:          AuthorizationState;
   onAuthChange?:  (v: AuthorizationState) => void;
@@ -328,10 +339,11 @@ export default function ModuleShell({
   steps, activeStep, onStepChange,
   billItems, isBillActive,
   onSave, isSaving, saveDisabled, configured = true, adapterName = 'Database',
-  editingId, onCancelEdit, onReset, onUpdate, updateModule, updateLabel, updateSearchPlaceholder,
-  children,
+  editingId, onCancelEdit, onReset, onUpdate, onUpdateSearch, updateModule, updateLabel, updateSearchPlaceholder,
+  children, hideStepNav,
   calcRows, totalRow,
   records = [], isLoading, onLoadRecord, onDeleteRecord, onReload,
+  recordBadge, recordLabel,
   auth, onAuthChange,
   onPrint, onPDF, onExcel, onWord,
   lang = 'bn',
@@ -600,18 +612,7 @@ export default function ModuleShell({
 
             {/* Save / Reset — pinned to bottom, never scrolls away */}
             <div style={{ flexShrink: 0, padding: '12px 10px 14px', display: 'flex', flexDirection: 'column', gap: 6, borderTop: '1px solid rgba(255,255,255,.07)' }}>
-              {/* {editingId && onCancelEdit && (
-                <button onClick={onCancelEdit} style={{
-                  display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center',
-                  padding: '7px 10px', borderRadius: 8, border: '1px solid rgba(251,191,36,.4)',
-                  background: 'transparent', color: '#fbbf24', fontSize: 12, fontWeight: 600,
-                  cursor: 'pointer', fontFamily: font,
-                }}>
-                  <FaTimes style={{ fontSize: 11 }}/>
-                  {lang === 'bn' ? 'বাতিল' : 'Cancel'}
-                </button>
-              )} */}
-              <button onClick={handleSave}
+              {onSave && (<button onClick={handleSave}
                 disabled={!!(isSaving || saveDisabled || !configured)}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center',
@@ -632,8 +633,9 @@ export default function ModuleShell({
                   : editingId ? (lang === 'bn' ? 'আপডেট করুন' : 'Update')
                   : (lang === 'bn' ? 'সংরক্ষণ করুন' : 'Save')}
               </button>
+              )}
               {onUpdate && (
-                <button onClick={() => setShowUpdate(true)} style={{
+                <button onClick={() => onUpdateSearch ? onUpdateSearch() : setShowUpdate(true)} style={{
                   display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center',
                   padding: '7px 10px', borderRadius: 8,
                   border: '1px solid rgba(245,158,11,.45)',
@@ -702,7 +704,7 @@ export default function ModuleShell({
           </div>
 
           {/* Prev / Next — fixed at bottom, never scrolls away */}
-          {!isBillActive && (
+          {!isBillActive && !hideStepNav && (
             <div className="no-print" style={{ flexShrink: 0, padding: '12px 20px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f1f5f9' }}>
               <button
                 onClick={() => hasPrev && onStepChange(steps[currentIdx - 1].id)}
@@ -711,7 +713,7 @@ export default function ModuleShell({
               >
                 ← {lang === 'bn' ? 'পূর্ববর্তী' : 'Previous'}
               </button>
-              {mobile && (
+              {mobile && onSave && (
                 <button onClick={handleSave}
                   disabled={!!(isSaving || saveDisabled || !configured)}
                   style={{ ...S.btn(true, saved ? '#16a34a' : editingId ? '#d97706' : '#1e40af') }}>
@@ -806,7 +808,9 @@ export default function ModuleShell({
                   )}
                   {records.map(rec => {
                     const isEditing = rec.id === editingId;
-                    const name = String(rec.employeeName ?? rec.fullName ?? rec.subject ?? '—');
+                    const name = recordLabel
+                      ? recordLabel(rec)
+                      : String(rec.employeeName ?? rec.fullName ?? rec.subject ?? rec.id ?? '—');
                     return (
                       <div key={String(rec.id)} className="shell-hist-row" style={{
                         display: 'flex', alignItems: 'center', gap: 8,
@@ -822,6 +826,9 @@ export default function ModuleShell({
                           <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 1 }}>
                             {formatSavedAt(String(rec.savedAt ?? ''))}
                           </div>
+                          {recordBadge && (
+                            <div style={{ marginTop: 4 }}>{recordBadge(rec)}</div>
+                          )}
                         </div>
                         {onDeleteRecord && (
                           <button onClick={e => { e.stopPropagation(); if (window.confirm(lang === 'bn' ? 'মুছবেন?' : 'Delete?')) onDeleteRecord(String(rec.id)); }}

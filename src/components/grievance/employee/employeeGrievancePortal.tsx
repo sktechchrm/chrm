@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   FaShieldAlt,
   FaFileSignature,
@@ -9,6 +9,8 @@ import { S } from "../shared/styles";
 import SubmitView from "../employee/SubmitView";
 import TrackView from "../employee/TrackView";
 import ManagementView from "../management/ManagementView";
+import { apiGet } from "../shared/api";
+import type { Grievance } from "../shared/types";
 
 type ViewId = "submit" | "track" | "management";
 
@@ -19,6 +21,23 @@ interface NavItem {
 }
 
 export default function GrievanceModule() {
+  // ── Grievance data for ManagementView ──────────────────────────────────────
+  const [grievances,  setGrievances]  = useState<Grievance[]>([]);
+  const [grLoading,   setGrLoading]   = useState(false);
+
+  const loadGrievances = useCallback(async () => {
+    setGrLoading(true);
+    try {
+      const res = await apiGet({ action: 'getAll' });
+      if (res.success && Array.isArray(res.data)) {
+        setGrievances((res.data as Grievance[]).slice().reverse());
+      }
+    } catch { /* silent */ }
+    setGrLoading(false);
+  }, []);
+
+  useEffect(() => { loadGrievances(); }, [loadGrievances]);
+
   const [view, setView] = useState<ViewId>("submit");
 
   const navItems: NavItem[] = [
@@ -195,7 +214,7 @@ export default function GrievanceModule() {
       <main style={S.body}>
         {view === "submit" && <SubmitView />}
         {view === "track" && <TrackView />}
-        {view === "management" && <ManagementView grievances={[]} loading={false} onRefresh={async () => {}} />}
+        {view === "management" && <ManagementView grievances={grievances} loading={grLoading} onRefresh={loadGrievances} />}
       </main>
     </div>
   );

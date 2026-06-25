@@ -24,8 +24,9 @@ const ALL_HR_MODULES = [
   { id: 'requisition',  label: 'Requisition'        },
   { id: 'increment',    label: 'Salary Increment'   },
   { id: 'meeting',      label: 'Meeting Minutes'    },
-  { id: 'workerrights', label: 'Worker Rights'      },
-  { id: 'grievance',    label: 'Grievance'          },
+  { id: 'workerrights',    label: 'Worker Rights'      },
+  { id: 'workerguideline', label: 'Worker Guideline'   },
+  { id: 'grievance',       label: 'Grievance'          },
 ];
 
 type ProfileTab = 'profile' | 'factory' | 'committees';

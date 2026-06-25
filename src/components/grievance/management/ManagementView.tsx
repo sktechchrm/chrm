@@ -89,14 +89,14 @@ export default function ManagementView({
       {/* Stats — clickable filter pills */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))", gap: 8, marginBottom: "1.25rem" }}>
         {[
-          { label: "মোট", val: grievances.length, color: "#1a1a18" },
-          ...FLOW_STEPS.map(s => ({ label: s.label, val: counts[s.status] || 0, color: s.color })),
+          { label: "মোট", status: "সব",  val: grievances.length, color: "#1a1a18" },
+          ...FLOW_STEPS.map(s => ({ label: s.label, status: s.status, val: counts[s.status] || 0, color: s.color })),
         ].map(s => (
-          <div key={s.label}
-            onClick={() => setFilter(filter === s.label ? "সব" : s.label === "মোট" ? "সব" : s.label)}
+          <div key={s.status}
+            onClick={() => setFilter(filter === s.status ? "সব" : s.status)}
             style={{
-              background: (s.label === "মোট" ? filter === "সব" : filter === s.label) ? s.color : "#fff",
-              color:      (s.label === "মোট" ? filter === "সব" : filter === s.label) ? "#fff" : s.color,
+              background: filter === s.status ? s.color : "#fff",
+              color:      filter === s.status ? "#fff" : s.color,
               borderRadius: 10, border: `1px solid ${s.color}`,
               padding: "10px 12px", textAlign: "center", cursor: "pointer",
               transition: "all .15s",

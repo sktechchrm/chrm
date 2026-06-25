@@ -7,7 +7,7 @@ import {
   FaClipboardList, FaFileInvoiceDollar, FaBriefcase,
   FaUserCircle, FaSignOutAlt, FaBars, FaTimes,
   FaChevronDown, FaLayerGroup, FaBuilding, FaExchangeAlt, FaUserShield, FaHeadset,
-  FaChartBar, FaIdBadge,
+  FaChartBar, FaIdBadge, FaBookOpen,
 } from "react-icons/fa";
 import { useAuth } from "../../context/AuthContext";
 import { ROLE_META } from "../../auth/users";
@@ -32,8 +32,9 @@ const ALL_HR_MODULES = [
   { id: "requisition",  label: "Requisition",          icon: FaClipboardList },
   { id: "increment",    label: "Salary Increment",     icon: FaFileInvoiceDollar },
   { id: "meeting",      label: "Meeting Minutes",      icon: FaBriefcase },
-  { id: "workerrights", label: "Worker Rights",        icon: FaUserShield },
-  { id: "grievance",    label: "Grievance",            icon: FaHeadset    },
+  { id: "workerrights",     label: "Worker Rights",        icon: FaUserShield },
+  { id: "workerguideline",  label: "Worker Guideline",     icon: FaBookOpen   },
+  { id: "grievance",        label: "Grievance",            icon: FaHeadset    },
   { id: "reports",      label: "Reports",               icon: FaChartBar   },
   { id: "authority",    label: "Authority Control",     icon: FaIdBadge    },
 ];

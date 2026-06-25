@@ -104,7 +104,21 @@ export default function RewardApp() {
             {currentPage === "meeting"         && <Meeting />}
             {currentPage === "workerrights"    && <WorkerRights />}
             {currentPage === "workerguideline" && <WorkerGuidelineViewer />}
-            {currentPage === "reports"         && <ReportModule onNavigateToModule={(mod, _rec) => goTo(mod)} />}
+            {currentPage === "reports"         && <ReportModule onNavigateToModule={(mod, _rec) => {
+              // Map DbModule names → currentPage IDs used by RewardApp
+              const DB_TO_PAGE: Record<string, string> = {
+                employees:    'personalfile',
+                settlements:  'settlement',
+                maternity:    'maternity',
+                leftnotice:   'leftnotice',
+                requisitions: 'requisition',
+                increments:   'increment',
+                meetings:     'meeting',
+                grievance:    'grievance',
+              };
+              const page = DB_TO_PAGE[mod] ?? mod;
+              goTo(page);
+            }} />}
             {currentPage === "authority"       && <AuthorityControlModule />}
             {currentPage === "database"        && <DatabaseAdminModule />}
             {currentPage === "grievance"       && <GrievanceModule />}

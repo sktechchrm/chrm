@@ -5,16 +5,16 @@
  * records. No static text, no generic recommendations, no fabricated findings.
  *
  * Sections (data-only):
- *   Cover     — factory header + 4 real KPI numbers
- *   Section 1 — Status breakdown (donut + table)
- *   Section 2 — Urgency breakdown (donut + table)
- *   Section 3 — Category breakdown (bar + table)
- *   Section 4 — Department breakdown (table)
- *   Section 5 — Full case register
- *   Section 6 — Authorisation (PrintSignatureRow)
+ *   Cover     — factory header + print date + 4 real KPI numbers
+ *   Section 1 — Status breakdown (donut chart)
+ *   Section 2 — Urgency breakdown (donut chart)
+ *   Section 3 — Category breakdown (vertical bar chart)
+ *   Section 4 — Department/section breakdown (vertical bar chart)
+ *   Section 5 — Full case register (table, overdue flagged ⚠)
+ *   Section 6 — Authorisation (PrintSignatureRow from ModuleShell auth state)
  *
- * Print: iframe-based (maternity pattern).
- * PDF:   exportToPDF utility.
+ * Print: iframe-based (maternity pattern) — pixel-perfect A4.
+ * PDF:   same iframe → browser print dialog → "Save as PDF" (no canvas blur).
  */
 
 import { useState, useRef, forwardRef, useImperativeHandle } from 'react';
@@ -22,7 +22,8 @@ import type { Grievance } from '../shared/types';
 import { FLOW_STEPS, STATUS_COLORS, URGENCY_COLORS } from '../shared/constants';
 import { FaSpinner } from 'react-icons/fa';
 import { useFactory }    from '../../../hooks/useFactory';
-import { exportToPDF }   from '../../../utils/pdfExport';
+import { PrintSignatureRow } from '../../common/AuthorizationBlock';
+import type { AuthorizationState } from '../../common/AuthorizationBlock';
 
 const MONTHS_BN = ['জানুয়ারি','ফেব্রুয়ারি','মার্চ','এপ্রিল','মে','জুন','জুলাই','আগস্ট','সেপ্টেম্বর','অক্টোবর','নভেম্বর','ডিসেম্বর'];
 const MONTHS_EN = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -103,37 +104,60 @@ const T = {
 // ── SVG Donut ────────────────────────────────────────────────────────────────
 interface Slice { label: string; value: number; color: string; }
 
-function Donut({ slices, size = 140 }: { slices: Slice[]; size?: number }) {
+function Donut({ slices, size = 160 }: { slices: Slice[]; size?: number }) {
   const total = slices.reduce((a, s) => a + s.value, 0);
   if (total === 0) return (
     <div style={{ width:size, height:size, borderRadius:'50%', background:'#f1f5f9',
       display:'flex', alignItems:'center', justifyContent:'center',
       margin:'0 auto', fontSize:11, color:'#94a3b8' }}>—</div>
   );
-  const cx = size/2, cy = size/2, r = size/2 - 6;
-  let cum = -Math.PI/2;
-  const paths = slices.filter(s => s.value > 0).map(s => {
-    const angle = (s.value/total)*2*Math.PI;
-    const x1 = cx+r*Math.cos(cum), y1 = cy+r*Math.sin(cum);
-    cum += angle;
-    const x2 = cx+r*Math.cos(cum), y2 = cy+r*Math.sin(cum);
-    const mid = cum - angle/2;
-    const lx = cx+r*.62*Math.cos(mid), ly = cy+r*.62*Math.sin(mid);
-    const pct = Math.round(s.value/total*100);
-    return { d:`M${cx},${cy}L${x1},${y1}A${r},${r} 0 ${angle>Math.PI?1:0},1 ${x2},${y2}Z`,
-             color:s.color, pct, lx, ly };
-  });
+
+  const cx = size/2, cy = size/2, r = size/2 - 8;
+  const nonZero = slices.filter(s => s.value > 0);
+
+  // Build SVG paths — handle full-circle (single slice = 100%) as a special case
+  const paths: { d:string; color:string; pct:number; lx:number; ly:number }[] = [];
+
+  if (nonZero.length === 1) {
+    // Single slice: draw two half-arcs to avoid degenerate start=end point
+    const s = nonZero[0];
+    const pct = 100;
+    paths.push({
+      d: `M${cx},${cy} L${cx},${cy-r} A${r},${r} 0 1,1 ${cx-0.01},${cy-r} Z`,
+      color: s.color, pct, lx: cx, ly: cy - r*.5,
+    });
+  } else {
+    let cum = -Math.PI/2;
+    nonZero.forEach(s => {
+      const angle = (s.value/total)*2*Math.PI;
+      const x1 = cx+r*Math.cos(cum), y1 = cy+r*Math.sin(cum);
+      cum += angle;
+      const x2 = cx+r*Math.cos(cum), y2 = cy+r*Math.sin(cum);
+      const mid = cum - angle/2;
+      const lx = cx+r*.62*Math.cos(mid), ly = cy+r*.62*Math.sin(mid);
+      const pct = Math.round(s.value/total*100);
+      paths.push({
+        d: `M${cx},${cy}L${x1},${y1}A${r},${r} 0 ${angle>Math.PI?1:0},1 ${x2},${y2}Z`,
+        color: s.color, pct, lx, ly,
+      });
+    });
+  }
+
   return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ display:'block', margin:'0 auto' }}>
+    // Use percentage width so it scales inside any column width
+    <svg width="100%" height={size} viewBox={`0 0 ${size} ${size}`}
+      style={{ display:'block', maxWidth:size, margin:'0 auto', overflow:'visible' }}>
       {paths.map((p,i) => (
         <g key={i}>
           <path d={p.d} fill={p.color} stroke="#fff" strokeWidth={2}/>
-          {p.pct >= 8 && <text x={p.lx} y={p.ly} textAnchor="middle" dominantBaseline="middle"
-            fill="#fff" fontSize={9} fontWeight="700">{p.pct}%</text>}
+          {p.pct >= 8 && (
+            <text x={p.lx} y={p.ly} textAnchor="middle" dominantBaseline="middle"
+              fill="#fff" fontSize={9} fontWeight="700">{p.pct}%</text>
+          )}
         </g>
       ))}
-      <circle cx={cx} cy={cy} r={r*.4} fill="#fff"/>
-      <text x={cx} y={cy-5}  textAnchor="middle" fill="#0f2442" fontSize={15} fontWeight="700">{total}</text>
+      <circle cx={cx} cy={cy} r={r*.42} fill="#fff"/>
+      <text x={cx} y={cy-4}  textAnchor="middle" fill="#0f2442" fontSize={14} fontWeight="700">{total}</text>
       <text x={cx} y={cy+10} textAnchor="middle" fill="#94a3b8" fontSize={9}>মোট</text>
     </svg>
   );
@@ -267,12 +291,13 @@ export interface MonthlyReportRef {
 interface MonthlyReportProps {
   grievances:    Grievance[];
   loading:       boolean;
+  auth:          AuthorizationState;
   lang:          'bn' | 'en';
   onLangChange?: (l: 'bn' | 'en') => void;
 }
 
 const MonthlyReport = forwardRef<MonthlyReportRef, MonthlyReportProps>(
-function MonthlyReport({ grievances, loading, lang, onLangChange }, ref) {
+function MonthlyReport({ grievances, loading, auth, lang, onLangChange }, ref) {
   const factory   = useFactory();
   const t         = T[lang];
   const today     = new Date();
@@ -281,26 +306,32 @@ function MonthlyReport({ grievances, loading, lang, onLangChange }, ref) {
   const [year,  setYear]  = useState(today.getFullYear());
 
   // ── Print (iframe — maternity pattern) ───────────────────────────────────
-  const handlePrint = () => {
+  const buildIframeDoc = (title: string) => {
     const el = reportRef.current;
-    if (!el) { window.print(); return; }
-    const iframe = document.createElement('iframe');
-    iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:210mm;height:297mm;border:none;';
-    document.body.appendChild(iframe);
-    const doc = iframe.contentDocument!;
+    if (!el) return null;
     const styles = Array.from(document.styleSheets)
       .map(ss => { try { return Array.from(ss.cssRules).map(r => r.cssText).join('\n'); } catch { return ''; } })
       .join('\n');
-    doc.open();
-    doc.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title>
       <style>
         @page{size:A4 portrait;margin:12mm 14mm;}
         body{margin:0;font-family:'Noto Sans Bengali',Arial,sans-serif;color:#000;}
         .no-print{display:none!important;}
         ${styles}
       </style>
-      </head><body>${el.outerHTML}</body></html>`);
-    doc.close();
+      </head><body>${el.outerHTML}</body></html>`;
+  };
+
+  const handlePrint = () => {
+    const el = reportRef.current;
+    if (!el) { window.print(); return; }
+    const html = buildIframeDoc('Grievance Report');
+    if (!html) return;
+    const iframe = document.createElement('iframe');
+    iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:210mm;height:297mm;border:none;';
+    document.body.appendChild(iframe);
+    const doc = iframe.contentDocument!;
+    doc.open(); doc.write(html); doc.close();
     iframe.onload = () => {
       iframe.contentWindow!.focus();
       iframe.contentWindow!.print();
@@ -308,10 +339,76 @@ function MonthlyReport({ grievances, loading, lang, onLangChange }, ref) {
     };
   };
 
+  // PDF — renders the print-identical HTML in a hidden iframe at A4 width,
+  // captures with html2canvas, then saves via jsPDF. No print dialog shown.
   const handleExportPDF = async () => {
-    const el = reportRef.current;
-    if (!el) return;
-    await exportToPDF({ element:el, filename:`GrievanceReport-${MONTHS_EN[month]}-${year}`, scale:2 });
+    const html = buildIframeDoc(`GrievanceReport-${MONTHS_EN[month]}-${year}`);
+    if (!html) return;
+
+    // 1. Create an offscreen iframe at exact A4 pixel width (210mm @ 96dpi = 794px)
+    const iframe = document.createElement('iframe');
+    iframe.style.cssText = [
+      'position:fixed', 'top:0', 'left:-9999px',
+      'width:794px',    'height:1123px',   // A4 portrait px
+      'border:none',    'visibility:hidden',
+    ].join(';');
+    document.body.appendChild(iframe);
+
+    await new Promise<void>(resolve => {
+      iframe.onload = () => resolve();
+      const doc = iframe.contentDocument!;
+      doc.open(); doc.write(html); doc.close();
+    });
+
+    // 2. Wait for fonts + SVG layout to fully settle inside iframe
+    await new Promise(r => setTimeout(r, 1200));
+
+    // 3. Capture the iframe body at A4 width
+    const { default: html2canvas } = await import('html2canvas');
+    const { default: jsPDF }       = await import('jspdf');
+
+    const body = iframe.contentDocument!.body;
+    const canvas = await html2canvas(body, {
+      scale:           2,
+      useCORS:         true,
+      allowTaint:      true,
+      backgroundColor: '#ffffff',
+      logging:         false,
+      width:           794,
+      windowWidth:     794,
+    });
+
+    document.body.removeChild(iframe);
+
+    // 4. Build paginated PDF (A4 portrait, 10mm margins)
+    const MM_W = 210, MM_H = 297, MARGIN = 10;
+    const usableW = MM_W - MARGIN * 2;
+    const usableH = MM_H - MARGIN * 2;
+    const pxPerMm = canvas.width / usableW;
+    const totalH  = canvas.height / pxPerMm;
+
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    let yMm = 0, page = 0;
+
+    while (yMm < totalH) {
+      if (page > 0) doc.addPage();
+      const stripH  = Math.min(usableH, totalH - yMm);
+      const srcY    = yMm * pxPerMm;
+      const srcH    = stripH * pxPerMm;
+
+      const strip   = document.createElement('canvas');
+      strip.width   = canvas.width;
+      strip.height  = Math.ceil(srcH);
+      strip.getContext('2d')!.drawImage(
+        canvas, 0, srcY, canvas.width, srcH,
+        0, 0, canvas.width, Math.ceil(srcH),
+      );
+      doc.addImage(strip.toDataURL('image/jpeg', 0.97), 'JPEG', MARGIN, MARGIN, usableW, stripH);
+      yMm += stripH;
+      page++;
+    }
+
+    doc.save(`GrievanceReport-${MONTHS_EN[month]}-${year}.pdf`);
   };
 
   useImperativeHandle(ref, () => ({ print: handlePrint, exportPDF: handleExportPDF }));
@@ -494,7 +591,7 @@ function MonthlyReport({ grievances, loading, lang, onLangChange }, ref) {
                 <div style={{ display:'flex', flexWrap:'wrap', gap:'4px 10px', marginTop:10, justifyContent:'center' }}>
                   {statusRows.filter(r=>r.count>0).map(r=>(
                     <span key={r.label} style={{ display:'flex', alignItems:'center', gap:4, fontSize:11, color:'#374151' }}>
-                      <span style={{ width:8, height:8, borderRadius:2, border:`1.5px solid ${r.color}`, flexShrink:0, display:'inline-block' }}/>
+                      <span style={{ width:8, height:8, borderRadius:2, background:r.color, flexShrink:0, display:'inline-block' }}/>
                       {r.label} ({r.count})
                     </span>
                   ))}
@@ -506,7 +603,7 @@ function MonthlyReport({ grievances, loading, lang, onLangChange }, ref) {
                 <div style={{ display:'flex', flexWrap:'wrap', gap:'4px 10px', marginTop:10, justifyContent:'center' }}>
                   {urgencyRows.filter(r=>r.count>0).map(r=>(
                     <span key={r.label} style={{ display:'flex', alignItems:'center', gap:4, fontSize:11, color:'#374151' }}>
-                      <span style={{ width:8, height:8, borderRadius:2, border:`1.5px solid ${r.color}`, flexShrink:0, display:'inline-block' }}/>
+                      <span style={{ width:8, height:8, borderRadius:2, background:r.color, flexShrink:0, display:'inline-block' }}/>
                       {r.label} ({r.count})
                     </span>
                   ))}
@@ -606,6 +703,19 @@ function MonthlyReport({ grievances, loading, lang, onLangChange }, ref) {
           </>)}
 
 
+
+          {/* ── Section 6 — Authorisation ────────────────────────────── */}
+          <div style={{ marginBottom:16 }}>
+            <div style={{ fontSize:11, fontWeight:700, letterSpacing:'.06em',
+              textTransform:'uppercase' as const, color:'#0f2442',
+              borderBottom:'1.5px solid #0f2442', paddingBottom:5, marginBottom:12 }}>
+              {t.s6}
+            </div>
+            <div style={{ fontSize:12, color:'#64748b', marginBottom:14, lineHeight:1.7 }}>
+              {t.auth} {t.period} {lang==='bn' ? MONTHS_BN[month] : MONTHS_EN[month]} 1–{lastDay}, {year}.
+            </div>
+            <PrintSignatureRow value={auth} lang={lang} hidePrepared />
+          </div>
 
           {/* Footer */}
           <div style={{ borderTop:'1px solid #000', marginTop:20, paddingTop:8,

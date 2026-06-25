@@ -18,12 +18,14 @@
  */
 
 import { useState, useRef, forwardRef, useImperativeHandle } from 'react';
+import { pdf } from '@react-pdf/renderer';
 import type { Grievance } from '../shared/types';
 import { FLOW_STEPS, STATUS_COLORS, URGENCY_COLORS } from '../shared/constants';
 import { FaSpinner } from 'react-icons/fa';
 import { useFactory }    from '../../../hooks/useFactory';
 import { PrintSignatureRow } from '../../common/AuthorizationBlock';
 import type { AuthorizationState } from '../../common/AuthorizationBlock';
+import { GrievancePDFDocument } from './GrievancePDF';
 
 const MONTHS_BN = ['জানুয়ারি','ফেব্রুয়ারি','মার্চ','এপ্রিল','মে','জুন','জুলাই','আগস্ট','সেপ্টেম্বর','অক্টোবর','নভেম্বর','ডিসেম্বর'];
 const MONTHS_EN = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -284,8 +286,9 @@ function BkTable({ rows, labelKey, t }: {
 
 // ── Exports ──────────────────────────────────────────────────────────────────
 export interface MonthlyReportRef {
-  print:     () => void;
-  exportPDF: () => Promise<void>;
+  print:      () => void;
+  exportPDF:  () => Promise<void>;
+  pdfLoading: boolean;
 }
 
 interface MonthlyReportProps {
@@ -304,6 +307,7 @@ function MonthlyReport({ grievances, loading, auth, lang, onLangChange }, ref) {
   const reportRef = useRef<HTMLDivElement>(null);
   const [month, setMonth] = useState(today.getMonth());
   const [year,  setYear]  = useState(today.getFullYear());
+  const [pdfLoading, setPdfLoading] = useState(false);
 
   // ── Print (iframe — maternity pattern) ───────────────────────────────────
   const buildIframeDoc = (title: string) => {
@@ -339,79 +343,74 @@ function MonthlyReport({ grievances, loading, auth, lang, onLangChange }, ref) {
     };
   };
 
-  // PDF — renders the print-identical HTML in a hidden iframe at A4 width,
-  // captures with html2canvas, then saves via jsPDF. No print dialog shown.
+  // PDF — @react-pdf/renderer vector PDF (crisp text, sharp charts, no canvas blur)
   const handleExportPDF = async () => {
-    const html = buildIframeDoc(`GrievanceReport-${MONTHS_EN[month]}-${year}`);
-    if (!html) return;
+    if (pdfLoading) return;
+    setPdfLoading(true);
+    try {
+      const auth2 = factory.authorities;
+      const L = {
+        authorized: lang === 'bn' ? 'অনুমোদনকারী' : 'Authorized by',
+        approved:   lang === 'bn' ? 'অনুমোদনকারী' : 'Approved by',
+      };
+      const signatories = [
+        {
+          label: L.authorized,
+          name:  lang==='bn' ? auth2.hrManager.name        : auth2.hrManager.nameEn,
+          desig: lang==='bn' ? auth2.hrManager.designation  : auth2.hrManager.designationEn,
+          show:  auth.visibility?.hrManager !== false,
+        },
+        {
+          label: L.authorized,
+          name:  lang==='bn' ? auth2.factoryHead.name        : auth2.factoryHead.nameEn,
+          desig: lang==='bn' ? auth2.factoryHead.designation  : auth2.factoryHead.designationEn,
+          show:  auth.visibility?.factoryHead !== false,
+        },
+        {
+          label: L.approved,
+          name:  lang==='bn' ? auth2.hoHrHead.name        : auth2.hoHrHead.nameEn,
+          desig: lang==='bn' ? auth2.hoHrHead.designation  : auth2.hoHrHead.designationEn,
+          show:  auth.visibility?.hoHrHead !== false,
+        },
+        {
+          label: L.approved,
+          name:  lang==='bn' ? auth2.headOfOperations.name        : auth2.headOfOperations.nameEn,
+          desig: lang==='bn' ? auth2.headOfOperations.designation  : auth2.headOfOperations.designationEn,
+          show:  auth.visibility?.headOfOperations !== false,
+        },
+      ];
 
-    // 1. Create an offscreen iframe at exact A4 pixel width (210mm @ 96dpi = 794px)
-    const iframe = document.createElement('iframe');
-    iframe.style.cssText = [
-      'position:fixed', 'top:0', 'left:-9999px',
-      'width:794px',    'height:1123px',   // A4 portrait px
-      'border:none',    'visibility:hidden',
-    ].join(';');
-    document.body.appendChild(iframe);
+      const blob = await pdf(
+        <GrievancePDFDocument
+          grievances={grievances}
+          month={month}
+          year={year}
+          lang={lang}
+          auth={auth}
+          signatories={signatories}
+          factoryName={factory.nameEn || factory.nameBn}
+          factoryAddr={factory.addressEn || factory.addressBn}
+        />
+      ).toBlob();
 
-    await new Promise<void>(resolve => {
-      iframe.onload = () => resolve();
-      const doc = iframe.contentDocument!;
-      doc.open(); doc.write(html); doc.close();
-    });
-
-    // 2. Wait for fonts + SVG layout to fully settle inside iframe
-    await new Promise(r => setTimeout(r, 1200));
-
-    // 3. Capture the iframe body at A4 width
-    const { default: html2canvas } = await import('html2canvas');
-    const { default: jsPDF }       = await import('jspdf');
-
-    const body = iframe.contentDocument!.body;
-    const canvas = await html2canvas(body, {
-      scale:           2,
-      useCORS:         true,
-      allowTaint:      true,
-      backgroundColor: '#ffffff',
-      logging:         false,
-      width:           794,
-      windowWidth:     794,
-    });
-
-    document.body.removeChild(iframe);
-
-    // 4. Build paginated PDF (A4 portrait, 10mm margins)
-    const MM_W = 210, MM_H = 297, MARGIN = 10;
-    const usableW = MM_W - MARGIN * 2;
-    const usableH = MM_H - MARGIN * 2;
-    const pxPerMm = canvas.width / usableW;
-    const totalH  = canvas.height / pxPerMm;
-
-    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    let yMm = 0, page = 0;
-
-    while (yMm < totalH) {
-      if (page > 0) doc.addPage();
-      const stripH  = Math.min(usableH, totalH - yMm);
-      const srcY    = yMm * pxPerMm;
-      const srcH    = stripH * pxPerMm;
-
-      const strip   = document.createElement('canvas');
-      strip.width   = canvas.width;
-      strip.height  = Math.ceil(srcH);
-      strip.getContext('2d')!.drawImage(
-        canvas, 0, srcY, canvas.width, srcH,
-        0, 0, canvas.width, Math.ceil(srcH),
-      );
-      doc.addImage(strip.toDataURL('image/jpeg', 0.97), 'JPEG', MARGIN, MARGIN, usableW, stripH);
-      yMm += stripH;
-      page++;
+      const url = URL.createObjectURL(blob);
+      const a   = document.createElement('a');
+      a.href     = url;
+      a.download = `GrievanceReport-${MONTHS_EN[month]}-${year}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      const msg = err instanceof Error ? `${err.message}\n\n${err.stack?.split('\n').slice(0,4).join('\n')}` : String(err);
+      console.error('PDF export failed:', err);
+      alert('PDF Error:\n' + msg);
+    } finally {
+      setPdfLoading(false);
     }
-
-    doc.save(`GrievanceReport-${MONTHS_EN[month]}-${year}.pdf`);
   };
 
-  useImperativeHandle(ref, () => ({ print: handlePrint, exportPDF: handleExportPDF }));
+  useImperativeHandle(ref, () => ({ print: handlePrint, exportPDF: handleExportPDF, pdfLoading }), [pdfLoading]);
 
   // ── Filter ────────────────────────────────────────────────────────────────
   const filtered = grievances.filter(g => {

@@ -18,14 +18,13 @@
  */
 
 import { useState, useRef, forwardRef, useImperativeHandle } from 'react';
-import { pdf } from '@react-pdf/renderer';
+import generatePDF, { Margin, Resolution } from 'react-to-pdf';
 import type { Grievance } from '../shared/types';
 import { FLOW_STEPS, STATUS_COLORS, URGENCY_COLORS } from '../shared/constants';
 import { FaSpinner } from 'react-icons/fa';
 import { useFactory }    from '../../../hooks/useFactory';
 import { PrintSignatureRow } from '../../common/AuthorizationBlock';
 import type { AuthorizationState } from '../../common/AuthorizationBlock';
-import { GrievancePDFDocument } from './GrievancePDF';
 
 const MONTHS_BN = ['জানুয়ারি','ফেব্রুয়ারি','মার্চ','এপ্রিল','মে','জুন','জুলাই','আগস্ট','সেপ্টেম্বর','অক্টোবর','নভেম্বর','ডিসেম্বর'];
 const MONTHS_EN = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -344,67 +343,26 @@ function MonthlyReport({ grievances, loading, auth, lang, onLangChange }, ref) {
   };
 
   // PDF — @react-pdf/renderer vector PDF (crisp text, sharp charts, no canvas blur)
+  // PDF — react-to-pdf captures the reportRef DOM element directly.
+  // No print dialog, no external font fetching, direct download.
   const handleExportPDF = async () => {
-    if (pdfLoading) return;
+    if (pdfLoading || !reportRef.current) return;
     setPdfLoading(true);
     try {
-      const auth2 = factory.authorities;
-      const L = {
-        authorized: lang === 'bn' ? 'অনুমোদনকারী' : 'Authorized by',
-        approved:   lang === 'bn' ? 'অনুমোদনকারী' : 'Approved by',
-      };
-      const signatories = [
-        {
-          label: L.authorized,
-          name:  lang==='bn' ? auth2.hrManager.name        : auth2.hrManager.nameEn,
-          desig: lang==='bn' ? auth2.hrManager.designation  : auth2.hrManager.designationEn,
-          show:  auth.visibility?.hrManager !== false,
+      await generatePDF(reportRef, {
+        filename: `GrievanceReport-${MONTHS_EN[month]}-${year}.pdf`,
+        page: {
+          margin:     Margin.MEDIUM,
+          format:     'A4',
+          orientation:'portrait',
         },
-        {
-          label: L.authorized,
-          name:  lang==='bn' ? auth2.factoryHead.name        : auth2.factoryHead.nameEn,
-          desig: lang==='bn' ? auth2.factoryHead.designation  : auth2.factoryHead.designationEn,
-          show:  auth.visibility?.factoryHead !== false,
+        resolution: Resolution.HIGH,
+        overrides: {
+          canvas: { useCORS: true, scale: 2 },
         },
-        {
-          label: L.approved,
-          name:  lang==='bn' ? auth2.hoHrHead.name        : auth2.hoHrHead.nameEn,
-          desig: lang==='bn' ? auth2.hoHrHead.designation  : auth2.hoHrHead.designationEn,
-          show:  auth.visibility?.hoHrHead !== false,
-        },
-        {
-          label: L.approved,
-          name:  lang==='bn' ? auth2.headOfOperations.name        : auth2.headOfOperations.nameEn,
-          desig: lang==='bn' ? auth2.headOfOperations.designation  : auth2.headOfOperations.designationEn,
-          show:  auth.visibility?.headOfOperations !== false,
-        },
-      ];
-
-      const blob = await pdf(
-        <GrievancePDFDocument
-          grievances={grievances}
-          month={month}
-          year={year}
-          lang={lang}
-          auth={auth}
-          signatories={signatories}
-          factoryName={factory.nameEn || factory.nameBn}
-          factoryAddr={factory.addressEn || factory.addressBn}
-        />
-      ).toBlob();
-
-      const url = URL.createObjectURL(blob);
-      const a   = document.createElement('a');
-      a.href     = url;
-      a.download = `GrievanceReport-${MONTHS_EN[month]}-${year}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      });
     } catch (err) {
-      const msg = err instanceof Error ? `${err.message}\n\n${err.stack?.split('\n').slice(0,4).join('\n')}` : String(err);
       console.error('PDF export failed:', err);
-      alert('PDF Error:\n' + msg);
     } finally {
       setPdfLoading(false);
     }

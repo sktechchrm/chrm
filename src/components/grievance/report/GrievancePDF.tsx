@@ -1,7 +1,4 @@
-/**
- * GrievancePDF.tsx — @react-pdf/renderer vector PDF document
- * Vector PDF: crisp Bengali text, sharp pie charts, no html2canvas blur.
- */
+// GrievancePDF v7 — PieChart via Circle strokeDasharray, safe() via T wrapper
 import React from 'react';
 import {
   Document, Page, View, Text, StyleSheet, Font, Svg, Circle,
@@ -19,12 +16,14 @@ import NotoBoldUrl    from '../../../assets/fonts/NotoSansBengali-Bold.ttf?url';
 
 // ── Register Noto Sans Bengali ────────────────────────────────────────────────
 Font.register({
-  family: 'NotoSans',
+  family: 'RMS-Bengali',
   fonts: [
     { src: NotoRegularUrl, fontWeight: 400 },
     { src: NotoBoldUrl,    fontWeight: 700 },
   ],
 });
+// Disable hyphenation — reduces complex shaping that can trigger fontkit bugs
+Font.registerHyphenationCallback(word => [word]);
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const MONTHS_BN = ['জানুয়ারি','ফেব্রুয়ারি','মার্চ','এপ্রিল','মে','জুন','জুলাই','আগস্ট','সেপ্টেম্বর','অক্টোবর','নভেম্বর','ডিসেম্বর'];
@@ -59,7 +58,7 @@ function T({ children, style }: { children?: React.ReactNode; style?: object }) 
 
 // ── Styles ───────────────────────────────────────────────────────────────────
 const S = StyleSheet.create({
-  page:       { fontFamily:'NotoSans', fontSize:9, padding:'12mm 14mm', color:'#1e293b', backgroundColor:'#fff' },
+  page:       { fontFamily:'RMS-Bengali', fontSize:9, padding:'12mm 14mm', color:'#1e293b', backgroundColor:'#fff' },
   coverBand:  { backgroundColor:'#0f2442', padding:14, borderRadius:6, marginBottom:10 },
   coverRow:   { flexDirection:'row', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8 },
   kpiGrid:    { flexDirection:'row', borderRadius:4, overflow:'hidden', marginTop:8 },

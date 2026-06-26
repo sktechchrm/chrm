@@ -8,9 +8,8 @@ import {
   FaTimes, FaQrcode, FaCopy, FaCheck, FaExternalLinkAlt,
   FaFilePdf, FaPrint, FaLink, FaShieldAlt, FaPhone,
 } from 'react-icons/fa';
-
+import { getGuidelineConfig } from './workerGuidelineData';
 import { getFactoryById } from '../../factories/FactoryRegistry';
-import AppButton from '../common/AppButton';
 
 // ── QR Display ────────────────────────────────────────────────────────────────
 interface QRDisplayProps { url: string; size?: number; onReady?: (dataUrl: string) => void; }
@@ -57,7 +56,7 @@ const QRDisplay: React.FC<QRDisplayProps> = ({ url, size = 200, onReady }) => {
   if (error) return (
     <div style={{ width: size, height: size, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#fef2f2', border: '2px dashed #fca5a5', borderRadius: '8px', gap: '8px' }}>
       <FaQrcode style={{ fontSize: '32px', color: '#ef4444' }} />
-      <div style={{ fontSize: '11px', color: '#dc2626', textAlign: 'center', padding: '0 8px' }} role="alert">QR needs internet. Use the link below.</div>
+      <div style={{ fontSize: '11px', color: '#dc2626', textAlign: 'center', padding: '0 8px' }}>QR needs internet. Use the link below.</div>
     </div>
   );
   return <img src={qrDataUrl} alt="Worker Guideline QR Code" style={{ width: size, height: size, display: 'block' }} />;
@@ -71,8 +70,8 @@ interface WorkerGuidelinePopupProps {
 }
 
 export default function WorkerGuidelinePopup({ factoryId, onClose, onOpen }: WorkerGuidelinePopupProps) {
+  const cfg     = getGuidelineConfig(factoryId);
   const factory = getFactoryById(factoryId);
-  const cfg     = factory.workerGuidelineConfig;
   const profile = factory.workerProfile;
   const [copied,   setCopied]   = useState(false);
   const [qrSrc,    setQrSrc]    = useState<string>('');
@@ -253,23 +252,25 @@ export default function WorkerGuidelinePopup({ factoryId, onClose, onOpen }: Wor
               <div className="wgp-topbar-sub">কর্মচারী নির্দেশিকা — QR অ্যাক্সেস</div>
             </div>
             <div className="wgp-topbar-actions">
-              <AppButton
-                variant="print"
+              <button
+                className="wgp-tb-btn wgp-tb-btn--print"
                 onClick={handlePrint}
                 disabled={!qrSrc}
                 title={!qrSrc ? 'Waiting for QR code…' : 'Print QR sheet'}
+                style={!qrSrc ? {opacity:0.45, cursor:'not-allowed'} : {}}
               >
-                <FaPrint aria-hidden="true" /><span>{qrSrc ? 'Print' : '…'}</span>
-              </AppButton>
-              <AppButton
-                variant="pdf"
+                <FaPrint /><span>{qrSrc ? 'Print' : '…'}</span>
+              </button>
+              <button
+                className="wgp-tb-btn wgp-tb-btn--pdf"
                 onClick={handleExportPDF}
                 disabled={!qrSrc}
                 title={!qrSrc ? 'Waiting for QR code…' : 'Export PDF'}
+                style={!qrSrc ? {opacity:0.45, cursor:'not-allowed'} : {}}
               >
-                <FaFilePdf aria-hidden="true" /><span>{qrSrc ? 'PDF' : '…'}</span>
-              </AppButton>
-              <AppButton variant="icon" onClick={onClose} title="Close"><FaTimes aria-hidden="true" /></AppButton>
+                <FaFilePdf /><span>{qrSrc ? 'PDF' : '…'}</span>
+              </button>
+              <button className="wgp-close-btn" onClick={onClose}><FaTimes /></button>
             </div>
           </div>
 
@@ -285,11 +286,11 @@ export default function WorkerGuidelinePopup({ factoryId, onClose, onOpen }: Wor
           {/* Body */}
           <div className="wgp-body">
             <div className="wgp-qr-section">
-              <div className="wgp-qr-label"><FaQrcode aria-hidden="true" /> স্ক্যান করুন — শ্রমিক নির্দেশিকা দেখতে</div>
+              <div className="wgp-qr-label"><FaQrcode /> স্ক্যান করুন — শ্রমিক নির্দেশিকা দেখতে</div>
               <div className="wgp-qr-wrap">
                 <QRDisplay url={publicUrl} size={200} onReady={setQrSrc} />
               </div>
-              <div className="wgp-safe-badge"><FaShieldAlt aria-hidden="true" /> কোনো লগইন প্রয়োজন নেই — সরাসরি অ্যাক্সেস</div>
+              <div className="wgp-safe-badge"><FaShieldAlt /> কোনো লগইন প্রয়োজন নেই — সরাসরি অ্যাক্সেস</div>
               <div className="wgp-qr-hint">মোবাইলের ক্যামেরা দিয়ে QR কোড স্ক্যান করুন</div>
               {/* QR ready status for print/pdf */}
               {qrSrc ? (
@@ -304,20 +305,20 @@ export default function WorkerGuidelinePopup({ factoryId, onClose, onOpen }: Wor
             </div>
 
             <div className="wgp-link-section">
-              <div className="wgp-link-label"><FaLink aria-hidden="true" /> পাবলিক লিংক</div>
+              <div className="wgp-link-label"><FaLink /> পাবলিক লিংক</div>
               <div className="wgp-link-row">
                 <a href={publicUrl} target="_blank" rel="noopener noreferrer" className="wgp-link-url" title={publicUrl}>
                   {publicUrl}
                 </a>
-                <AppButton variant="primary" className="!px-2.5 !py-1 !text-xs !shadow-none" onClick={handleCopy}>
-                  {copied ? <FaCheck aria-hidden="true" /> : <FaCopy aria-hidden="true" />}{copied ? 'Copied!' : 'Copy'}
-                </AppButton>
+                <button className={`wgp-copy-btn ${copied ? 'wgp-copy-btn--copied' : 'wgp-copy-btn--default'}`} onClick={handleCopy}>
+                  {copied ? <FaCheck /> : <FaCopy />}{copied ? 'Copied!' : 'Copy'}
+                </button>
               </div>
             </div>
 
-            <AppButton variant="primary" onClick={onOpen} className="w-full !justify-center !py-2.5">
-              <FaExternalLinkAlt aria-hidden="true" /> সম্পূর্ণ নির্দেশিকা দেখুন
-            </AppButton>
+            <button className="wgp-open-btn" onClick={onOpen}>
+              <FaExternalLinkAlt /> সম্পূর্ণ নির্দেশিকা দেখুন
+            </button>
           </div>
         </div>
       </div>

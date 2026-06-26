@@ -13,10 +13,11 @@ export const MG_SHIRTEX: FactoryConfig = {
   id:        'mg_shirtex',
   nameEn:    'MG SHIRTEX LTD.',
   nameBn:    'এমজি শার্টেক্স লিমিটেড',
-  addressEn: '32, Lakshmipura, Chandana, Joydevpur, Gazipur-1700',
+  addressEn: '32, Lakshmipura, Chandana, Joydebpur, Gazipur-1700',
   addressBn: '৩২, লক্ষ্মীপুরা, চন্দনা, জয়দেবপুর, গাজীপুর-১৭০০।',
-  spreadsheetId: '19vrtziPadEt4LzAn_qGvhl87elzsoxZmQ1qvNQY_2wg',  
+  spreadsheetId: '19vrtziPadEt4LzAn_qGvhl87elzsoxZmQ1qvNQY_2wg',
   active:    true,
+
   // ── Database: MG Shirtex uses Google Sheets ───────────────────────────────
   db: {
     adapter:       'sheets',
@@ -29,29 +30,53 @@ export const MG_SHIRTEX: FactoryConfig = {
   // AUTHORITIES  (used in increment bills, settlements, requisitions, etc.)
   // ════════════════════════════════════════════════════════════════════════════
   authorities: {
+    honorableChairman: {
+      name:          'ড. রুবানা হক',
+      nameEn:        'Dr. Rubana Huq',
+      designation:   'চেয়ারম্যান',
+      designationEn: 'Chairman',
+      email:         '',
+      phone:         '',
+    },
+    honorableMD: {
+      name:          'নাবিদুল হক',
+      nameEn:        'Navidul Huq',
+      designation:   'ব্যবস্থাপনা পরিচালক',
+      designationEn: 'Managing Director',
+      email:         '',
+      phone:         '',
+    },
     factoryHead: {
       name:          'পাঞ্জাব আলী',
       nameEn:        'Md. Panzab Ali',
       designation:   'কারখানা প্রধান',
       designationEn: 'Sr. Manager (Factory)',
+      email:         '',
+      phone:         '',
     },
     hrManager: {
       name:          'সাইফুল ইসলাম',
       nameEn:        'Saiful Islam',
-      designation:   'ব্যবস্থাপক (মানবসম্পদ, প্রশাসন ও সম্মতি)',
+      designation:   'ব্যবস্থাপক (মানবসম্পদ, প্রশাসন ও কমপ্লায়েন্স)',
       designationEn: 'Manager (HR, Admin & Compliance)',
+      email:         '',
+      phone:         '',
     },
     hoHrHead: {
       name:          'মোঃ একরামুল হক',
       nameEn:        'Md. Ekramul Haque',
       designation:   'সিনিয়র ব্যবস্থাপক (প্রধান কার্যালয় এইচআর ও কমপ্লায়েন্স)',
       designationEn: 'Sr. Manager (HO HR & Compliance)',
+      email:         '',
+      phone:         '',
     },
     headOfOperations: {
-      name:          'মোঃ রেহান ইদ্রিস',
-      nameEn:        'Md. Rehan Idris',
-      designation:   'পরিচালন প্রধান',
+      name:          'মোঃ রেহান ইদ্রিসী',
+      nameEn:        'Md. Rehan Idrisee',
+      designation:   'অপারেশনের প্রধান',
       designationEn: 'Head of Operations',
+      email:         '',
+      phone:         '',
     },
   },
 
@@ -68,10 +93,11 @@ export const MG_SHIRTEX: FactoryConfig = {
   // ════════════════════════════════════════════════════════════════════════════
 
   // ════════════════════════════════════════════════════════════════════════════
-  // WORKER GUIDELINE HR CONFIG — salary, leave, working hours, notice periods.
-  // Edit here to update the Worker Guideline page for this factory.
+  // WORKER GUIDELINE — HR policy data (salary, leave, overtime, environment)
+  // Uses the new WorkerGuideline interface (split probation, split notice,
+  // two lunch shifts, string numerals for Bengali display).
   // ════════════════════════════════════════════════════════════════════════════
-  workerGuidelineConfig: {
+  workerGuideline: {
     salary: {
       basicSalary:       6700,
       houseRent:         3350,
@@ -80,11 +106,13 @@ export const MG_SHIRTEX: FactoryConfig = {
       foodAllowance:     1250,
       total:            12500,
     },
-    workingHoursPerDay:  8,
-    maxOvertimeHours:    2,
-    overtimeFormula:     'মূলবেতন ÷ ২০৮ × ২ × অতিরিক্ত কাজের ঘণ্টা',
-    probationMonths:     3,
-    noticePeriodDays: { permanent: 60, temporary: 30, other: 14 },
+    workingHoursPerDay:    '৮',
+    maxOvertimeHours:      '২',
+    overtimeFormula:       'মূলবেতন ÷ ২০৮ × ২ × অতিরিক্ত কাজের ঘণ্টা',
+    probationMonthsSkill:  '৩',
+    probationMonthsUnSkill:'৬',
+    noticePeriodDaysOwner:  { permanent: 120, temporary: 30, other: 14 },
+    noticePeriodDaysWorker: { permanent: 60,  temporary: 30 },
     leave: {
       casualLeave:    10,
       sickLeave:      14,
@@ -99,9 +127,9 @@ export const MG_SHIRTEX: FactoryConfig = {
       wasteReductionPct: 25,
       targetYear:        2030,
     },
-    salaryPaymentDays: 7,
-    lunchBreakStart:   '১:০০',
-    lunchBreakEnd:     '২:০০',
+    salaryPaymentDays: '৭',
+    lunchScheduleOne:  'দুপুর ১:০০ টা থেকে ২:০০ টা',
+    lunchScheduleTwo:  'দুপুর ১:৩০ টা থেকে ২:৩০ টা',
   },
 
   // ════════════════════════════════════════════════════════════════════════════
@@ -111,22 +139,24 @@ export const MG_SHIRTEX: FactoryConfig = {
   workerProfile: {
     establishedYear:   '২০০৫',
     totalFloors:       6,
-    totalWorkers:      1127,
+    totalWorkers:      1197,
     totalShifts:       1,
     totalSewingLines:  9,
     totalBathrooms:    78,
-    dailyProduction:   11700,
-    monthlyProduction: 365000,
-    yearlyProduction:  4380000,
+    dailyProduction:   13461,
+    monthlyProduction: 350000,
+    yearlyProduction:  4200000,
     welfareOfficers: [
       { name: 'নাজনীন নাহার', designation: 'ওয়েলফেয়ার অফিসার' },
     ],
     hotlines: [
-      { label: 'হট লাইন ১', number: '01730319917' },
-      { label: 'হট লাইন ২', number: '01323522190' },
+      { label: 'অভিযোগ (HO)', number: '01730319917' },
+      { label: 'অভিযোগ',      number: '01323522190' },
+      { label: 'নিরাপত্তা',   number: '01861393111' },
+      { label: 'পরিবেশ',      number: '01946825593' },
     ],
-    buyers:       ['H & M', 'Devenharms', 'Primark', 'Springfield', 'Elcorti', 'Zin Toni'],
-    productTypes: ['Man Shirt', 'Ladies Shirt', 'Boys Shirt', 'Casual Shirt (Woven Items)'],
+    buyers:       ['H & M', 'Primark', 'Springfield', 'TMS', 'ZXY'],
+    productTypes: ['Mens Shirt', 'Ladies Shirt', 'Boys Shirt', 'Casual Shirt'],
     sections:     ['Cutting', 'Sewing', 'Finishing', 'Quality', 'Button', 'Packing'],
   },
 
@@ -168,16 +198,16 @@ export const MG_SHIRTEX: FactoryConfig = {
       secretaryDept:          'এইচআর বিভাগ',
       establishDate:          '2021-06-20',
       members: [
-        { name: 'মোঃ সাইফুল ইসলাম',        gender: 'পুরুষ',  designation: 'সুপারভাইজার',          section: 'সেলাই বিভাগ' },
-        { name: 'নাসিমা আক্তার',             gender: 'মহিলা', designation: 'অপারেটর',               section: 'ফিনিশিং বিভাগ' },
-        { name: 'মোঃ ইমরান হোসেন',          gender: 'পুরুষ',  designation: 'লাইন চিফ',             section: 'কাটিং বিভাগ' },
-        { name: 'তানিয়া বেগম',               gender: 'মহিলা', designation: 'অপারেটর',               section: 'সেলাই বিভাগ' },
-        { name: 'মোঃ মাসুদ রানা',           gender: 'পুরুষ',  designation: 'টেকনিশিয়ান',          section: 'মেইনটেন্যান্স' },
-        { name: 'ফাতেমা খাতুন',              gender: 'মহিলা', designation: 'হেল্পার',               section: 'সেলাই বিভাগ' },
-        { name: 'মোঃ রাকিবুল হাসান',        gender: 'পুরুষ',  designation: 'আইটি অফিসার',         section: 'আইটি বিভাগ' },
-        { name: 'শামীমা আক্তার',             gender: 'মহিলা', designation: 'অপারেটর',               section: 'কোয়ালিটি বিভাগ' },
+        { name: 'মোঃ সাইফুল ইসলাম',        gender: 'পুরুষ',  designation: 'সুপারভাইজার',            section: 'সেলাই বিভাগ' },
+        { name: 'নাসিমা আক্তার',             gender: 'মহিলা', designation: 'অপারেটর',                 section: 'ফিনিশিং বিভাগ' },
+        { name: 'মোঃ ইমরান হোসেন',          gender: 'পুরুষ',  designation: 'লাইন চিফ',               section: 'কাটিং বিভাগ' },
+        { name: 'তানিয়া বেগম',               gender: 'মহিলা', designation: 'অপারেটর',                 section: 'সেলাই বিভাগ' },
+        { name: 'মোঃ মাসুদ রানা',           gender: 'পুরুষ',  designation: 'টেকনিশিয়ান',            section: 'মেইনটেন্যান্স' },
+        { name: 'ফাতেমা খাতুন',              gender: 'মহিলা', designation: 'হেল্পার',                 section: 'সেলাই বিভাগ' },
+        { name: 'মোঃ রাকিবুল হাসান',        gender: 'পুরুষ',  designation: 'আইটি অফিসার',           section: 'আইটি বিভাগ' },
+        { name: 'শামীমা আক্তার',             gender: 'মহিলা', designation: 'অপারেটর',                 section: 'কোয়ালিটি বিভাগ' },
         { name: 'মোঃ আল আমিন',              gender: 'পুরুষ',  designation: 'স্টোর অ্যাসিস্ট্যান্ট', section: 'স্টোর বিভাগ' },
-        { name: 'জেসমিন আক্তার',             gender: 'মহিলা', designation: 'অপারেটর',               section: 'ফিনিশিং বিভাগ' },
+        { name: 'জেসমিন আক্তার',             gender: 'মহিলা', designation: 'অপারেটর',                 section: 'ফিনিশিং বিভাগ' },
       ],
     },
 
@@ -216,12 +246,12 @@ export const MG_SHIRTEX: FactoryConfig = {
       secretaryDept:          'এইচ আর এডমিন এন্ড কমপ্লায়েন্স বিভাগ',
       establishDate:          '2022-12-22',
       members: [
-        { name: 'মোঃ ফরিদ আহমেদ',        gender: 'পুরুষ',  designation: 'জুনিঃ সুপারভাইজার',       section: 'সেলাই বিভাগ' },
-        { name: 'নাসির হোসেন',             gender: 'পুরুষ',  designation: 'অপারেটর',                  section: 'সেলাই বিভাগ' },
-        { name: 'মোছাঃ শাহানাজ শানু',     gender: 'মহিলা', designation: 'সিঃ অপারেটর',             section: 'সেলাই বিভাগ' },
+        { name: 'মোঃ ফরিদ আহমেদ',        gender: 'পুরুষ',  designation: 'জুনিঃ সুপারভাইজার',        section: 'সেলাই বিভাগ' },
+        { name: 'নাসির হোসেন',             gender: 'পুরুষ',  designation: 'অপারেটর',                   section: 'সেলাই বিভাগ' },
+        { name: 'মোছাঃ শাহানাজ শানু',     gender: 'মহিলা', designation: 'সিঃ অপারেটর',              section: 'সেলাই বিভাগ' },
         { name: 'মোঃ আইয়ুব আলী',         gender: 'পুরুষ',  designation: 'সিঃ কোয়ালিটি ইন্সপেক্টর', section: 'কোয়ালিটি বিভাগ' },
-        { name: 'সুস্মিতা রানী মজুমদার', gender: 'মহিলা', designation: 'সুপারভাইজার',              section: 'সেলাই বিভাগ' },
-        { name: 'মোছাঃ ডলি আক্তার',      gender: 'মহিলা', designation: 'অপারেটর',                  section: 'সেলাই বিভাগ' },
+        { name: 'সুস্মিতা রানী মজুমদার', gender: 'মহিলা', designation: 'সুপারভাইজার',               section: 'সেলাই বিভাগ' },
+        { name: 'মোছাঃ ডলি আক্তার',      gender: 'মহিলা', designation: 'অপারেটর',                   section: 'সেলাই বিভাগ' },
       ],
     },
 

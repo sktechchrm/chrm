@@ -1,14 +1,27 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// ModuleShell — Global Standard Layout (Layout 2)
+// ModuleShell — Global Standard Layout (Design System v2)
 // src/components/shell/ModuleShell.tsx
+//
+// Changes from v1:
+//   • Dual theme (Refined Slate / Dark Mode) with localStorage persistence
+//   • Dark/light toggle embedded in header
+//   • Improved sidebar visual hierarchy — active border, done checkmarks
+//   • Updated buttons: primary, warning, danger with WCAG AA contrast
+//   • Status pills with dot + label (never color-only)
+//   • Border radius: 6px inputs, 8px buttons, 12px cards
+//   • Focus rings on all interactive elements (WCAG 2.2)
+//   • ARIA labels on all icon-only buttons
+//   • Inter font via CSS var, falls back to system-ui
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import {
+  useState, useRef, useEffect, useLayoutEffect, useCallback,
+} from 'react';
 import {
   FaSave, FaTimes, FaSearch, FaEdit, FaCalendarAlt,
   FaTrash, FaSyncAlt, FaChevronDown,
   FaFilePdf, FaFileExcel, FaFileWord,
-  FaDownload, FaPrint, FaDatabase,
+  FaDownload, FaPrint, FaDatabase, FaSun, FaMoon,
 } from 'react-icons/fa';
 import { useFactory }            from '../../hooks/useFactory';
 import AuthorityIconButton       from '../common/AuthorityIconButton';
@@ -17,7 +30,163 @@ import { DataUseCases }          from '../../business/DataUseCases';
 import type { DbModule, DbRecord } from '../../business/DataUseCases';
 import { formatSavedAt }         from '../../utils/dateUtils';
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// ── Theme definitions ─────────────────────────────────────────────────────────
+
+interface Theme {
+  // Header / sidebar
+  headerBg:        string;
+  headerText:      string;
+  sidebarBg:       string;
+  sidebarText:     string;
+  sidebarActive:   string;
+  sidebarActiveBg: string;
+  sidebarBorder:   string;
+  sidebarLabel:    string;
+  sidebarDone:     string;
+  // Content
+  pageBg:          string;
+  cardBg:          string;
+  cardBorder:      string;
+  text:            string;
+  textSec:         string;
+  textMut:         string;
+  // Inputs
+  inputBg:         string;
+  inputBorder:     string;
+  inputFocus:      string;
+  // Buttons
+  btnPri:          string;
+  btnPriText:      string;
+  btnWarnText:     string;
+  btnWarnBorder:   string;
+  btnDangerText:   string;
+  btnDangerBorder: string;
+  btnOutBg:        string;
+  btnOutText:      string;
+  btnOutBorder:    string;
+  // Table
+  tblHead:         string;
+  tblBorder:       string;
+  tblAlt:          string;
+  // Status
+  success:         { bg: string; brd: string; txt: string; dot: string };
+  warning:         { bg: string; brd: string; txt: string; dot: string };
+  danger:          { bg: string; brd: string; txt: string; dot: string };
+  accent:          { bg: string; brd: string; txt: string; dot: string };
+  // Edit banner
+  editBg:          string;
+  editBorder:      string;
+  editText:        string;
+  // Calc panel
+  calcTotalBg:     string;
+  rightBg:         string;
+  rightBorder:     string;
+  rightLabel:      string;
+  // Step heading
+  stepText:        string;
+  progBg:          string;
+  progFill:        string;
+}
+
+const LIGHT: Theme = {
+  headerBg:        '#0F2442',
+  headerText:      '#FFFFFF',
+  sidebarBg:       '#112240',
+  sidebarText:     'rgba(255,255,255,0.55)',
+  sidebarActive:   '#FFFFFF',
+  sidebarActiveBg: 'rgba(255,255,255,0.10)',
+  sidebarBorder:   '#60A5FA',
+  sidebarLabel:    'rgba(255,255,255,0.30)',
+  sidebarDone:     '#34D399',
+  pageBg:          '#F4F6F9',
+  cardBg:          '#FFFFFF',
+  cardBorder:      '#E2E8F0',
+  text:            '#1A202C',
+  textSec:         '#4A5568',
+  textMut:         '#94A3B8',
+  inputBg:         '#FFFFFF',
+  inputBorder:     '#CBD5E1',
+  inputFocus:      '#2563EB',
+  btnPri:          '#2563EB',
+  btnPriText:      '#FFFFFF',
+  btnWarnText:     '#92400E',
+  btnWarnBorder:   'rgba(217,119,6,0.45)',
+  btnDangerText:   'rgba(185,28,28,0.85)',
+  btnDangerBorder: 'rgba(220,38,38,0.35)',
+  btnOutBg:        '#FFFFFF',
+  btnOutText:      '#374151',
+  btnOutBorder:    '#E2E8F0',
+  tblHead:         '#F1F5F9',
+  tblBorder:       '#E2E8F0',
+  tblAlt:          '#F8FAFC',
+  success: { bg: '#F0FDF4', brd: '#86EFAC', txt: '#166534', dot: '#16A34A' },
+  warning: { bg: '#FFFBEB', brd: '#FDE68A', txt: '#92400E', dot: '#D97706' },
+  danger:  { bg: '#FEF2F2', brd: '#FECACA', txt: '#991B1B', dot: '#DC2626' },
+  accent:  { bg: '#EFF6FF', brd: '#BFDBFE', txt: '#1E40AF', dot: '#2563EB' },
+  editBg:      '#FFFBEB',
+  editBorder:  '#FDE68A',
+  editText:    '#92400E',
+  calcTotalBg: '#0F2442',
+  rightBg:     '#F8FAFC',
+  rightBorder: '#E2E8F0',
+  rightLabel:  '#94A3B8',
+  stepText:    '#1E3A5F',
+  progBg:      '#F1F5F9',
+  progFill:    '#1E40AF',
+};
+
+const DARK: Theme = {
+  headerBg:        '#0A1628',
+  headerText:      '#F1F5F9',
+  sidebarBg:       '#080F1E',
+  sidebarText:     'rgba(241,245,249,0.40)',
+  sidebarActive:   '#93C5FD',
+  sidebarActiveBg: 'rgba(255,255,255,0.07)',
+  sidebarBorder:   '#3B82F6',
+  sidebarLabel:    'rgba(241,245,249,0.25)',
+  sidebarDone:     '#4ADE80',
+  pageBg:          '#0F172A',
+  cardBg:          '#1E293B',
+  cardBorder:      '#334155',
+  text:            '#F1F5F9',
+  textSec:         '#94A3B8',
+  textMut:         '#64748B',
+  inputBg:         '#1E293B',
+  inputBorder:     '#334155',
+  inputFocus:      '#3B82F6',
+  btnPri:          '#3B82F6',
+  btnPriText:      '#FFFFFF',
+  btnWarnText:     '#FCD34D',
+  btnWarnBorder:   'rgba(252,211,77,0.35)',
+  btnDangerText:   '#F87171',
+  btnDangerBorder: 'rgba(248,113,113,0.30)',
+  btnOutBg:        '#1E293B',
+  btnOutText:      '#94A3B8',
+  btnOutBorder:    '#334155',
+  tblHead:         '#162032',
+  tblBorder:       '#334155',
+  tblAlt:          '#162032',
+  success: { bg: '#052E16', brd: 'rgba(74,222,128,0.25)',  txt: '#4ADE80', dot: '#4ADE80' },
+  warning: { bg: '#1C1007', brd: 'rgba(252,211,77,0.25)', txt: '#FCD34D', dot: '#FCD34D' },
+  danger:  { bg: '#1C0607', brd: 'rgba(248,113,113,0.25)',txt: '#F87171', dot: '#F87171' },
+  accent:  { bg: '#1E3A5F', brd: 'rgba(147,197,253,0.2)', txt: '#93C5FD', dot: '#3B82F6' },
+  editBg:      '#1C1007',
+  editBorder:  'rgba(252,211,77,0.30)',
+  editText:    '#FCD34D',
+  calcTotalBg: '#0A1628',
+  rightBg:     '#162032',
+  rightBorder: '#334155',
+  rightLabel:  '#64748B',
+  stepText:    '#93C5FD',
+  progBg:      '#334155',
+  progFill:    '#3B82F6',
+};
+
+// ── Shared font ───────────────────────────────────────────────────────────────
+
+const font = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+
+// ── Types (unchanged from v1) ─────────────────────────────────────────────────
 
 export interface ShellStep {
   id:          string;
@@ -59,18 +228,12 @@ export interface ShellProps {
   onCancelEdit?:  () => void;
   onReset?:       () => void;
   onUpdate?:      (record: Record<string, unknown>) => void;
-  /** Override the built-in UpdateModal — if provided, clicking আপডেট সার্চ calls this
-   *  instead of opening the DataUseCases modal. Use for modules with their own search. */
   onUpdateSearch?: () => void;
   updateModule?:  DbModule;
   updateLabel?:   string;
-  /** Placeholder text for the update-search input — defaults to "কার্ড নং বা নাম..." */
   updateSearchPlaceholder?: string;
 
   children:       React.ReactNode;
-
-  /** Hide the ← পূর্ববর্তী / পরবর্তী → footer nav — for tab-style modules where steps
-   *  are independent views, not a sequential flow (e.g. grievance). */
   hideStepNav?:   boolean;
 
   calcRows?:      CalcRow[];
@@ -81,9 +244,7 @@ export interface ShellProps {
   onLoadRecord?:  (rec: Record<string, unknown>) => void;
   onDeleteRecord?:(id: string) => Promise<boolean>;
   onReload?:      () => void;
-  /** Optional badge rendered next to each record row — e.g. urgency badge for grievance */
   recordBadge?:   (rec: DbRecord) => React.ReactNode;
-  /** Optional label override per record — defaults to employeeName/fullName/subject/id */
   recordLabel?:   (rec: DbRecord) => string;
 
   auth?:          AuthorizationState;
@@ -96,37 +257,49 @@ export interface ShellProps {
   lang?: 'bn' | 'en';
 }
 
-// ── Styles ────────────────────────────────────────────────────────────────────
+// ── Theme hook ────────────────────────────────────────────────────────────────
 
-const font = "'Noto Sans Bengali', Arial, sans-serif";
+function useTheme() {
+  const [isDark, setIsDark] = useState<boolean>(() => {
+    try { return localStorage.getItem('rms-theme') === 'dark'; } catch { return false; }
+  });
 
-const S = {
-  btn: (active = false, color = '#1e40af'): React.CSSProperties => ({
+  const toggle = useCallback(() => {
+    setIsDark(d => {
+      const next = !d;
+      try { localStorage.setItem('rms-theme', next ? 'dark' : 'light'); } catch {}
+      return next;
+    });
+  }, []);
+
+  return { isDark, T: isDark ? DARK : LIGHT, toggle };
+}
+
+// ── Shared style helpers ──────────────────────────────────────────────────────
+
+function btnBase(T: Theme): React.CSSProperties {
+  return {
     display: 'inline-flex', alignItems: 'center', gap: 5,
-    padding: '6px 12px', borderRadius: 7, border: 'none',
-    fontSize: 12, fontWeight: 600, cursor: 'pointer',
-    fontFamily: font, whiteSpace: 'nowrap',
-    background: active ? color : '#fff',
-    color:      active ? '#fff' : color,
-    outline:    `1.5px solid ${active ? color : color + '55'}`,
-    transition: 'all .13s',
-  }),
-  iconBtn: (color = '#374151'): React.CSSProperties => ({
-    display: 'inline-flex', alignItems: 'center', gap: 5,
-    padding: '6px 10px', borderRadius: 7,
-    border: '1px solid #e2e8f0',
+    padding: '7px 13px', borderRadius: 8, border: 'none',
     fontSize: 12, fontWeight: 500, cursor: 'pointer',
-    fontFamily: font, background: '#fff', color,
-  }),
-};
+    fontFamily: font, whiteSpace: 'nowrap',
+    transition: 'opacity .13s, box-shadow .13s',
+    outline: 'none',
+  };
+}
+
+function focusRing(color: string): React.CSSProperties {
+  return { boxShadow: `0 0 0 3px ${color}33` };
+}
 
 // ── Export dropdown ───────────────────────────────────────────────────────────
 
-function ExportMenu({ onPDF, onExcel, onWord, lang }: {
-  onPDF?:()=>void; onExcel?:()=>void; onWord?:()=>void; lang: string;
+function ExportMenu({ onPDF, onExcel, onWord, lang, T }: {
+  onPDF?:()=>void; onExcel?:()=>void; onWord?:()=>void; lang: string; T: Theme;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (!open) return;
     const h = (e: MouseEvent) => {
@@ -135,33 +308,55 @@ function ExportMenu({ onPDF, onExcel, onWord, lang }: {
     document.addEventListener('mousedown', h);
     return () => document.removeEventListener('mousedown', h);
   }, [open]);
+
   const items = [
-    onPDF   && { icon: <FaFilePdf/>,   label: 'PDF',   color: '#dc2626', fn: onPDF   },
-    onExcel && { icon: <FaFileExcel/>, label: 'Excel', color: '#16a34a', fn: onExcel },
-    onWord  && { icon: <FaFileWord/>,  label: 'Word',  color: '#1d4ed8', fn: onWord  },
+    onPDF   && { icon: <FaFilePdf/>,   label: 'PDF',   color: '#DC2626', fn: onPDF   },
+    onExcel && { icon: <FaFileExcel/>, label: 'Excel', color: '#16A34A', fn: onExcel },
+    onWord  && { icon: <FaFileWord/>,  label: 'Word',  color: '#1D4ED8', fn: onWord  },
   ].filter(Boolean) as { icon: React.ReactNode; label: string; color: string; fn: ()=>void }[];
+
   if (!items.length) return null;
+
   return (
     <div ref={ref} style={{ position: 'relative' }}>
-      <button style={S.iconBtn()} onClick={() => setOpen(v => !v)}>
-        <FaDownload style={{ fontSize: 11 }}/>
+      <button
+        aria-label={lang === 'bn' ? 'এক্সপোর্ট মেনু' : 'Export menu'}
+        aria-expanded={open}
+        style={{
+          ...btnBase(T),
+          background: T.btnOutBg, color: T.btnOutText,
+          outline: `0.5px solid ${T.btnOutBorder}`,
+        }}
+        onClick={() => setOpen(v => !v)}
+      >
+        <FaDownload style={{ fontSize: 11 }} aria-hidden="true" />
         {lang === 'bn' ? 'এক্সপোর্ট' : 'Export'}
-        <FaChevronDown style={{ fontSize: 9, transform: open ? 'rotate(180deg)' : 'none', transition: '.15s' }}/>
+        <FaChevronDown
+          aria-hidden="true"
+          style={{ fontSize: 9, transform: open ? 'rotate(180deg)' : 'none', transition: '.15s' }}
+        />
       </button>
       {open && (
         <div style={{
           position: 'absolute', bottom: 'calc(100% + 6px)', right: 0, zIndex: 900,
-          background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10,
-          boxShadow: '0 8px 24px rgba(0,0,0,.12)', minWidth: 160, padding: 5,
+          background: T.cardBg, border: `0.5px solid ${T.cardBorder}`,
+          borderRadius: 12, boxShadow: '0 8px 24px rgba(0,0,0,.14)',
+          minWidth: 160, padding: 5,
         }}>
           {items.map((it, i) => (
-            <button key={i} onClick={() => { it.fn(); setOpen(false); }} style={{
-              display: 'flex', alignItems: 'center', gap: 8,
-              width: '100%', padding: '7px 10px', border: 'none',
-              borderRadius: 7, background: 'transparent', cursor: 'pointer',
-              fontFamily: font, fontSize: 13,
-            }}>
-              <span style={{ color: it.color, fontSize: 13 }}>{it.icon}</span>
+            <button
+              key={i}
+              onClick={() => { it.fn(); setOpen(false); }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                width: '100%', padding: '7px 10px', border: 'none',
+                borderRadius: 8, background: 'transparent', cursor: 'pointer',
+                fontFamily: font, fontSize: 13, color: T.text,
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = T.tblHead)}
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+            >
+              <span style={{ color: it.color, fontSize: 13 }} aria-hidden="true">{it.icon}</span>
               {it.label}
             </button>
           ))}
@@ -171,15 +366,70 @@ function ExportMenu({ onPDF, onExcel, onWord, lang }: {
   );
 }
 
+// ── Theme toggle button ───────────────────────────────────────────────────────
+
+function ThemeToggle({ isDark, onToggle }: { isDark: boolean; onToggle: () => void }) {
+  return (
+    <button
+      onClick={onToggle}
+      aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+      title={isDark ? 'Light mode' : 'Dark mode'}
+      style={{
+        width: 40, height: 22, borderRadius: 99,
+        background: isDark ? '#3B82F6' : 'rgba(255,255,255,0.18)',
+        border: isDark ? '1.5px solid #60A5FA' : '1.5px solid rgba(255,255,255,0.30)',
+        display: 'flex', alignItems: 'center', padding: 2,
+        cursor: 'pointer', transition: 'background .25s, border-color .25s',
+        outline: 'none', flexShrink: 0,
+      }}
+      onFocus={e => e.currentTarget.style.boxShadow = '0 0 0 3px rgba(96,165,250,0.45)'}
+      onBlur={e => e.currentTarget.style.boxShadow = 'none'}
+    >
+      <div style={{
+        width: 16, height: 16, borderRadius: '50%', background: '#fff',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        transform: isDark ? 'translateX(18px)' : 'translateX(0)',
+        transition: 'transform .25s',
+        flexShrink: 0,
+      }}>
+        {isDark
+          ? <FaMoon  aria-hidden="true" style={{ fontSize: 9,  color: '#3B82F6' }} />
+          : <FaSun   aria-hidden="true" style={{ fontSize: 9,  color: '#F59E0B' }} />
+        }
+      </div>
+    </button>
+  );
+}
+
+// ── Status pill ───────────────────────────────────────────────────────────────
+
+function StatusPill({
+  type, label, T,
+}: { type: 'success'|'warning'|'danger'|'accent'; label: string; T: Theme }) {
+  const s = T[type];
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 5,
+      fontSize: 11, padding: '2px 9px', borderRadius: 99,
+      background: s.bg, color: s.txt, border: `0.5px solid ${s.brd}`,
+      fontWeight: 500, whiteSpace: 'nowrap',
+    }}>
+      <span style={{ width: 6, height: 6, borderRadius: '50%', background: s.dot, flexShrink: 0 }} aria-hidden="true" />
+      {label}
+    </span>
+  );
+}
+
 // ── Update search modal ───────────────────────────────────────────────────────
 
-function UpdateModal({ onSelect, onClose, module, factoryId, label, placeholder }: {
+function UpdateModal({ onSelect, onClose, module, factoryId, label, placeholder, T }: {
   onSelect: (r: Record<string, unknown>) => void;
   onClose:  () => void;
   module?:  DbModule;
   factoryId?: string;
   label?:   string;
   placeholder?: string;
+  T: Theme;
 }) {
   const [q, setQ]             = useState('');
   const [dateQ, setDateQ]     = useState('');
@@ -195,9 +445,6 @@ function UpdateModal({ onSelect, onClose, module, factoryId, label, placeholder 
     setLoading(false);
     if (res.ok) {
       const qL = qTrim.toLowerCase();
-      // Search inside itemsJson / employeesJson too — matches item বিবরণ
-      // (particulars/paymentTo/remarks) for requisitions, or employee
-      // name/ID/designation/department for increments.
       const itemsMatch = (r: Record<string, unknown>): boolean => {
         if (!qL) return false;
         const checkJson = (raw: unknown, fields: string[]): boolean => {
@@ -215,17 +462,10 @@ function UpdateModal({ onSelect, onClose, module, factoryId, label, placeholder 
           checkJson(r.employeesJson, ['employeeName', 'employeeId', 'designation', 'department', 'remarks'])
         );
       };
-      // Date filter — matches against any common date field on the record.
-      // dateQ is an ISO "YYYY-MM-DD" string from the <input type="date">.
       const dateMatch = (r: Record<string, unknown>): boolean => {
         if (!dateQ) return true;
         const fields = [r.date, r.formDate, r.effectiveDate, r.deliveryDate, r.savedAt];
-        return fields.some(v => {
-          if (!v) return false;
-          const s = String(v);
-          // Compare just the date portion (handles both "YYYY-MM-DD" and full ISO timestamps)
-          return s.slice(0, 10) === dateQ;
-        });
+        return fields.some(v => v && String(v).slice(0, 10) === dateQ);
       };
       const textMatch = (r: Record<string, unknown>): boolean => {
         if (!qL) return true;
@@ -241,87 +481,109 @@ function UpdateModal({ onSelect, onClose, module, factoryId, label, placeholder 
     } else setError(res.error ?? 'লোড ব্যর্থ');
   };
 
+  const inp: React.CSSProperties = {
+    padding: '7px 11px', border: `1.5px solid ${T.inputBorder}`,
+    borderRadius: 7, fontSize: 13, fontFamily: font, outline: 'none',
+    background: T.inputBg, color: T.text,
+    transition: 'border-color .15s, box-shadow .15s',
+  };
+
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 9500, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.45)' }}/>
-      <div style={{ position: 'relative', background: '#fff', borderRadius: 14, width: '100%', maxWidth: 500, boxShadow: '0 20px 60px rgba(0,0,0,.2)', overflow: 'hidden', fontFamily: font }}>
-        <div style={{ background: '#1e3a5f', padding: '12px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ color: '#fff', fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <FaSearch/> {label ?? 'রেকর্ড খুঁজুন'}
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={label ?? 'রেকর্ড খুঁজুন'}
+      style={{ position: 'fixed', inset: 0, zIndex: 9500, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+    >
+      <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.48)' }} aria-hidden="true" />
+      <div style={{
+        position: 'relative', background: T.cardBg, borderRadius: 14,
+        width: '100%', maxWidth: 500, border: `0.5px solid ${T.cardBorder}`,
+        boxShadow: '0 20px 60px rgba(0,0,0,.22)', overflow: 'hidden', fontFamily: font,
+      }}>
+        <div style={{ background: T.headerBg, padding: '12px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ color: '#fff', fontSize: 14, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <FaSearch aria-hidden="true" /> {label ?? 'রেকর্ড খুঁজুন'}
           </span>
-          <button onClick={onClose} style={{ background: 'rgba(255,255,255,.15)', border: 'none', borderRadius: 7, padding: '4px 8px', cursor: 'pointer', color: '#fff' }}><FaTimes/></button>
+          <button
+            onClick={onClose}
+            aria-label="বন্ধ করুন"
+            style={{ background: 'rgba(255,255,255,.15)', border: 'none', borderRadius: 7, padding: '4px 8px', cursor: 'pointer', color: '#fff' }}
+          >
+            <FaTimes aria-hidden="true" />
+          </button>
         </div>
-        <div style={{ padding: '12px 18px', borderBottom: '1px solid #f1f5f9' }}>
+
+        <div style={{ padding: '12px 18px', borderBottom: `0.5px solid ${T.cardBorder}` }}>
           <div style={{ display: 'flex', gap: 8 }}>
-            <input autoFocus value={q} onChange={e => setQ(e.target.value)}
+            <input
+              autoFocus
+              value={q}
+              onChange={e => setQ(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && search()}
-              placeholder={placeholder ?? "কার্ড নং বা নাম..."}
-              style={{ flex: 1, padding: '7px 11px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, fontFamily: font, outline: 'none' }}/>
+              placeholder={placeholder ?? 'কার্ড নং বা নাম...'}
+              aria-label="কর্মী খুঁজুন"
+              style={{ ...inp, flex: 1 }}
+              onFocus={e => { e.currentTarget.style.borderColor = T.inputFocus; e.currentTarget.style.boxShadow = `0 0 0 3px ${T.inputFocus}22`; }}
+              onBlur={e => { e.currentTarget.style.borderColor = T.inputBorder; e.currentTarget.style.boxShadow = 'none'; }}
+            />
             <div style={{ position: 'relative', width: 140, flexShrink: 0 }}>
-              <FaCalendarAlt style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', fontSize: 12, color: '#94a3b8', pointerEvents: 'none' }}/>
-              <input type="date" value={dateQ} onChange={e => setDateQ(e.target.value)}
+              <FaCalendarAlt aria-hidden="true" style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', fontSize: 12, color: T.textMut, pointerEvents: 'none' }} />
+              <input
+                type="date"
+                value={dateQ}
+                onChange={e => setDateQ(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && search()}
                 title="তারিখ দিয়ে খুঁজুন"
-                style={{ width: '100%', padding: '7px 9px 7px 26px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 12, fontFamily: font, outline: 'none', color: dateQ ? '#1e293b' : '#94a3b8', boxSizing: 'border-box' }}/>
+                aria-label="তারিখ দিয়ে খুঁজুন"
+                style={{ ...inp, width: '100%', paddingLeft: 26, boxSizing: 'border-box', color: dateQ ? T.text : T.textMut }}
+                onFocus={e => { e.currentTarget.style.borderColor = T.inputFocus; e.currentTarget.style.boxShadow = `0 0 0 3px ${T.inputFocus}22`; }}
+                onBlur={e => { e.currentTarget.style.borderColor = T.inputBorder; e.currentTarget.style.boxShadow = 'none'; }}
+              />
             </div>
-            <button onClick={search} disabled={loading} style={{ padding: '7px 14px', background: '#1e40af', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: font }}>
+            <button
+              onClick={search}
+              disabled={loading}
+              aria-label="খুঁজুন"
+              style={{ padding: '7px 14px', background: T.btnPri, color: T.btnPriText, border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: font }}
+            >
               {loading ? '...' : 'খুঁজুন'}
             </button>
           </div>
-          {error && <div style={{ fontSize: 12, color: '#dc2626', marginTop: 6 }}>⚠ {error}</div>}
+          {error && <div role="alert" style={{ fontSize: 12, color: T.danger.txt, marginTop: 6 }}>⚠ {error}</div>}
         </div>
+
         <div style={{ maxHeight: 260, overflowY: 'auto' }}>
           {results.length === 0 && q && !loading && (
-            <div style={{ padding: 24, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>কোনো রেকর্ড পাওয়া যায়নি</div>
+            <div style={{ padding: 24, textAlign: 'center', color: T.textMut, fontSize: 13 }}>কোনো রেকর্ড পাওয়া যায়নি</div>
           )}
           {results.map(rec => {
-            const qL = q.trim().toLowerCase();
-            // If the query matched an item's particulars/paymentTo/remarks (not the
-            // record's own subject/cardNo/employeeName/id), show that item as a hint.
-            const directHit =
-              String(rec.cardNo ?? '').toLowerCase().includes(qL) ||
-              String(rec.employeeName ?? '').toLowerCase().includes(qL) ||
-              String(rec.subject ?? '').toLowerCase().includes(qL) ||
-              String(rec.id ?? '').toLowerCase().includes(qL);
-
-            let itemHint = '';
-            if (!directHit) {
-              const findHint = (raw: unknown, fields: string[]): string => {
-                if (typeof raw !== 'string' || !raw) return '';
-                try {
-                  const arr = JSON.parse(raw);
-                  if (!Array.isArray(arr)) return '';
-                  const hit = arr.find((it: Record<string, unknown>) =>
-                    fields.some(f => String(it?.[f] ?? '').toLowerCase().includes(qL))
-                  );
-                  if (!hit) return '';
-                  for (const f of fields) {
-                    const v = String(hit[f] ?? '');
-                    if (v) return v;
-                  }
-                  return '';
-                } catch { return ''; }
-              };
-              itemHint = findHint(rec.itemsJson,     ['particulars', 'paymentTo', 'remarks'])
-                      || findHint(rec.employeesJson, ['employeeName', 'employeeId', 'designation', 'department', 'remarks']);
-            }
-
+            const name = String(rec.employeeName ?? rec.fullName ?? rec.subject ?? '—');
             return (
-              <button key={String(rec.id)} onClick={() => { onSelect(rec); onClose(); }}
-                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 18px', border: 'none', borderBottom: '1px solid #f8fafc', background: 'transparent', cursor: 'pointer', fontFamily: font, textAlign: 'left' }}>
-                <div style={{ width: 32, height: 32, borderRadius: 8, background: '#eff6ff', border: '1.5px solid #bfdbfe', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#1d4ed8', flexShrink: 0 }}>
-                  <FaEdit style={{ fontSize: 12 }}/>
+              <button
+                key={String(rec.id)}
+                onClick={() => { onSelect(rec); onClose(); }}
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '9px 18px', border: 'none', borderBottom: `0.5px solid ${T.cardBorder}`,
+                  background: 'transparent', cursor: 'pointer', fontFamily: font, textAlign: 'left',
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = T.tblHead}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                onFocus={e => e.currentTarget.style.background = T.tblHead}
+                onBlur={e => e.currentTarget.style.background = 'transparent'}
+              >
+                <div style={{
+                  width: 32, height: 32, borderRadius: 8,
+                  background: T.accent.bg, border: `1.5px solid ${T.accent.brd}`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: T.accent.dot, flexShrink: 0,
+                }} aria-hidden="true">
+                  <FaEdit style={{ fontSize: 12 }} />
                 </div>
                 <div style={{ minWidth: 0, flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {String(rec.employeeName ?? rec.fullName ?? rec.subject ?? '—')}
-                  </div>
-                  <div style={{ fontSize: 11, color: '#6b7280' }}>ID: {String(rec.id)} · Card: {String(rec.cardNo ?? '—')}</div>
-                  {itemHint && (
-                    <div style={{ fontSize: 11, color: '#059669', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      ম্যাচ: {itemHint}
-                    </div>
-                  )}
+                  <div style={{ fontSize: 13, fontWeight: 500, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
+                  <div style={{ fontSize: 11, color: T.textMut }}>ID: {String(rec.id)} · Card: {String(rec.cardNo ?? '—')}</div>
                 </div>
               </button>
             );
@@ -349,10 +611,12 @@ export default function ModuleShell({
   lang = 'bn',
 }: ShellProps) {
   const factory = useFactory();
-  const [saved,            setSaved]           = useState(false);
-  const [showUpdate,       setShowUpdate]       = useState(false);
-  const [histExpanded,     setHistExpanded]     = useState(true);
-  const [expandedBillIdx,  setExpandedBillIdx]  = useState<number | null>(null);
+  const { isDark, T, toggle } = useTheme();
+
+  const [saved,           setSaved]          = useState(false);
+  const [showUpdate,      setShowUpdate]      = useState(false);
+  const [histExpanded,    setHistExpanded]    = useState(true);
+  const [expandedBillIdx, setExpandedBillIdx] = useState<number | null>(null);
 
   const [mobile, setMobile] = useState(() =>
     typeof window !== 'undefined' && window.innerWidth < 768
@@ -363,33 +627,22 @@ export default function ModuleShell({
     return () => window.removeEventListener('resize', h);
   }, []);
 
-  // ── Dynamic height: measures navbar above + footer below, fills the gap ──
+  // Dynamic full-height fill
   const rootRef = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const el = rootRef.current;
     if (!el) return;
-
     const measure = () => {
-      // Temporarily collapse to 0 so getBoundingClientRect gives true top position
       el.style.height = '0px';
-
-      const top = el.getBoundingClientRect().top; // px from viewport top = navbar height
-
-      // Sum heights of all siblings rendered AFTER this element (within same parent)
+      const top = el.getBoundingClientRect().top;
       let belowH = 0;
       let sib: Element | null = el.nextElementSibling;
       while (sib) { belowH += sib.getBoundingClientRect().height; sib = sib.nextElementSibling; }
-
-      // Also sum heights of all siblings of the parent rendered AFTER the parent
       sib = el.parentElement?.nextElementSibling ?? null;
       while (sib) { belowH += sib.getBoundingClientRect().height; sib = sib.nextElementSibling; }
-
       el.style.height = `${window.innerHeight - top - belowH}px`;
     };
-
     measure();
-
-    // Re-measure on any resize (window or DOM changes like footer toggling)
     const ro = new ResizeObserver(measure);
     ro.observe(document.documentElement);
     window.addEventListener('resize', measure);
@@ -402,82 +655,151 @@ export default function ModuleShell({
     if (ok) { setSaved(true); setTimeout(() => setSaved(false), 2500); }
   };
 
-  const currentIdx   = steps.findIndex(s => s.id === activeStep);
-  const hasPrev      = currentIdx > 0;
-  const hasNext      = currentIdx < steps.length - 1;
-  const totalBg      = totalRow ? '#0f2442' : undefined;
+  const currentIdx = steps.findIndex(s => s.id === activeStep);
+  const hasPrev    = currentIdx > 0;
+  const hasNext    = currentIdx < steps.length - 1;
+
+  // Sidebar button styles
+  const sbBtn = (active: boolean, done: boolean): React.CSSProperties => ({
+    display: 'flex', alignItems: 'center', gap: 9,
+    padding: '9px 14px', border: 'none', cursor: 'pointer', fontFamily: font,
+    background: active ? T.sidebarActiveBg : 'transparent',
+    borderLeft: `2.5px solid ${active ? T.sidebarBorder : done ? T.sidebarDone + '88' : 'transparent'}`,
+    color: active ? T.sidebarActive : done ? T.sidebarDone : T.sidebarText,
+    textAlign: 'left', width: '100%',
+    transition: 'all .12s',
+  });
+
+  const actionBtn = (
+    bg: string, color: string, border?: string, disabled = false,
+  ): React.CSSProperties => ({
+    display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center',
+    padding: '8px 10px', borderRadius: 8,
+    border: border ? `1px solid ${border}` : 'none',
+    background: bg, color,
+    fontSize: 12, fontWeight: 500, cursor: disabled ? 'not-allowed' : 'pointer',
+    fontFamily: font, opacity: disabled ? 0.52 : 1,
+    transition: 'opacity .13s, box-shadow .13s', outline: 'none',
+  });
+
+  const outBtn: React.CSSProperties = {
+    ...btnBase(T),
+    background: T.btnOutBg, color: T.btnOutText,
+    outline: `0.5px solid ${T.btnOutBorder}`,
+  };
 
   return (
-    // ── ROOT: height set dynamically by useLayoutEffect — fills navbar→footer gap
-    <div ref={rootRef} style={{
-      fontFamily: font,
-      background: '#f1f5f9',
-      display: 'flex',
-      flexDirection: 'column',
-      overflow: 'hidden',
-      // height is injected by the ResizeObserver above — do NOT set it here
-    }}>
+    <div
+      ref={rootRef}
+      style={{ fontFamily: font, background: T.pageBg, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+    >
       <style>{`
         @media print {
           .shell-sidebar { display: none !important; }
           .shell-right   { display: none !important; }
           .shell-header  { background: #fff !important; color: #000 !important; }
           .no-print      { display: none !important; }
-          .shell-content { border: none !important; }
         }
         @keyframes shellSpin { to { transform: rotate(360deg); } }
-        .shell-hist-row:hover { background: #f0f9ff; }
-        .shell-step:hover { background: rgba(255,255,255,.08); }
+        .shell-hist-row:hover { background: ${T.tblHead}; }
+        .shell-step:hover     { background: rgba(255,255,255,.06); }
+        :focus-visible {
+          outline: none;
+          box-shadow: 0 0 0 3px ${T.inputFocus}33;
+        }
       `}</style>
 
-      {/* ── ZONE A: Dark header — fixed height, never scrolls ───────────── */}
-      <div className="shell-header" style={{
-        flexShrink: 0,
-        display: 'grid', gridTemplateColumns: '1fr auto 1fr',
-        alignItems: 'center', padding: '10px 20px',
-        background: '#0f2442', color: '#fff', gap: 12,
-      }}>
+      {/* ── HEADER ─────────────────────────────────────────────────────────── */}
+      <div
+        className="shell-header"
+        style={{
+          flexShrink: 0,
+          display: 'grid', gridTemplateColumns: '1fr auto 1fr',
+          alignItems: 'center', padding: '10px 20px',
+          background: T.headerBg, color: T.headerText, gap: 12,
+        }}
+      >
+        {/* Left: factory info */}
         <div>
-          <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: '.4px', textTransform: 'uppercase' }}>
+          <div style={{ fontSize: 13, fontWeight: 500, letterSpacing: '.4px', textTransform: 'uppercase', color: T.headerText }}>
             {factory.nameEn}
           </div>
-          <div style={{ fontSize: 11, opacity: .65, marginTop: 2 }}>{factory.addressEn}</div>
+          <div style={{ fontSize: 11, opacity: .6, marginTop: 2, color: T.headerText }}>{factory.addressEn}</div>
         </div>
+
+        {/* Center: module name */}
         <div style={{ textAlign: 'center', minWidth: 200 }}>
-          <div style={{ fontSize: 17, fontWeight: 800 }}>{moduleName}</div>
-          {moduleNameEn && <div style={{ fontSize: 11, opacity: .6, marginTop: 2 }}>{moduleNameEn}</div>}
+          <div style={{ fontSize: 17, fontWeight: 500, color: T.headerText }}>{moduleName}</div>
+          {moduleNameEn && <div style={{ fontSize: 11, opacity: .55, marginTop: 2, color: T.headerText }}>{moduleNameEn}</div>}
         </div>
-        <div style={{ textAlign: 'right', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
-          <span style={{ fontSize: 11, opacity: .65 }}>{lang === 'bn' ? 'তারিখ:' : 'Date:'}</span>
+
+        {/* Right: date + theme toggle + user avatar */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10 }}>
+          <span style={{ fontSize: 11, opacity: .6, color: T.headerText }}>
+            {lang === 'bn' ? 'তারিখ:' : 'Date:'}
+          </span>
           {onDateChange ? (
-            <input type="date" value={date || ''} onChange={e => onDateChange(e.target.value)}
-              style={{ background: 'rgba(255,255,255,.12)', border: '0.5px solid rgba(255,255,255,.25)', borderRadius: 6, color: '#fff', fontSize: 12, padding: '3px 8px', outline: 'none', fontFamily: font, cursor: 'pointer' }}/>
+            <input
+              type="date"
+              value={date || ''}
+              onChange={e => onDateChange(e.target.value)}
+              aria-label={lang === 'bn' ? 'তারিখ পরিবর্তন করুন' : 'Change date'}
+              style={{
+                background: 'rgba(255,255,255,.12)', border: '0.5px solid rgba(255,255,255,.28)',
+                borderRadius: 6, color: '#fff', fontSize: 12, padding: '3px 8px',
+                outline: 'none', fontFamily: font, cursor: 'pointer',
+              }}
+            />
           ) : (
-            <span style={{ fontSize: 12, borderBottom: '1px solid rgba(255,255,255,.4)', paddingBottom: 1 }}>{date || '—'}</span>
+            <span style={{ fontSize: 12, color: T.headerText, borderBottom: '1px solid rgba(255,255,255,.35)', paddingBottom: 1 }}>
+              {date || '—'}
+            </span>
           )}
+
+          {/* Dark/light toggle */}
+          <ThemeToggle isDark={isDark} onToggle={toggle} />
+
+          {/* User avatar placeholder */}
+          {/* <div
+            style={{
+              width: 30, height: 30, borderRadius: '50%',
+              background: 'rgba(255,255,255,.15)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 11, fontWeight: 500, color: '#fff', cursor: 'pointer',
+              border: '1.5px solid rgba(255,255,255,.25)',
+            }}
+            title="User profile"
+          >
+            HR
+          </div> */}
         </div>
       </div>
 
-      {/* ── ZONE B: Mobile step strip — fixed height, never scrolls ────── */}
+      {/* ── MOBILE STEP STRIP ─────────────────────────────────────────────── */}
       {mobile && (
         <div className="no-print" style={{
-          flexShrink: 0,
-          background: '#fff', borderBottom: '1px solid #e2e8f0',
+          flexShrink: 0, background: T.cardBg,
+          borderBottom: `0.5px solid ${T.cardBorder}`,
           padding: '8px 12px', display: 'flex', gap: 6, overflowX: 'auto',
         }}>
           {steps.map((step, i) => {
             const isActive = activeStep === step.id;
             const isDone   = i < currentIdx;
             return (
-              <button key={step.id} onClick={() => onStepChange(step.id)} style={{
-                display: 'inline-flex', alignItems: 'center', gap: 5,
-                padding: '5px 12px', borderRadius: 20, border: 'none',
-                fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
-                fontFamily: font, flexShrink: 0,
-                background: isActive ? '#0f2442' : isDone ? '#dcfce7' : '#f1f5f9',
-                color:      isActive ? '#fff'    : isDone ? '#166534' : '#475569',
-              }}>
-                {isDone && <span style={{ fontSize: 10 }}>✓</span>}
+              <button
+                key={step.id}
+                onClick={() => onStepChange(step.id)}
+                aria-current={isActive ? 'step' : undefined}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 5,
+                  padding: '5px 12px', borderRadius: 20, border: 'none',
+                  fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                  fontFamily: font, flexShrink: 0, whiteSpace: 'nowrap',
+                  background: isActive ? T.headerBg : isDone ? T.success.bg : T.tblHead,
+                  color: isActive ? '#fff' : isDone ? T.success.txt : T.textSec,
+                }}
+              >
+                {isDone && <span aria-hidden="true" style={{ fontSize: 10 }}>✓</span>}
                 {step.label}
               </button>
             );
@@ -485,47 +807,43 @@ export default function ModuleShell({
         </div>
       )}
 
-      {/* ── BODY: Three-column grid — fills remaining height exactly ─────── */}
+      {/* ── BODY GRID ─────────────────────────────────────────────────────── */}
       <div style={{
-        flex: 1,
-        display: 'grid',
-        gridTemplateColumns: mobile ? '1fr' : '176px 1fr 232px',
-        overflow: 'hidden',   // ← prevents grid from growing past viewport
-        minHeight: 0,         // ← critical for flex children to shrink
+        flex: 1, display: 'grid',
+        gridTemplateColumns: mobile ? '1fr' : '180px 1fr 236px',
+        overflow: 'hidden', minHeight: 0,
       }}>
 
-        {/* ── ZONE B: Left sidebar (desktop) — internal scroll ─────────── */}
+        {/* ── SIDEBAR ───────────────────────────────────────────────────── */}
         {!mobile && (
-          <div className="shell-sidebar no-print" style={{
-            background: '#152f50',
-            display: 'flex',
-            flexDirection: 'column',
-            borderRight: '1px solid rgba(255,255,255,.07)',
-            overflow: 'hidden',   // column itself doesn't scroll
-            minHeight: 0,
-          }}>
-
-            {/* Step label */}
-            <div style={{ flexShrink: 0, padding: '14px 14px 8px', fontSize: 10, fontWeight: 700, letterSpacing: '.07em', textTransform: 'uppercase', color: 'rgba(255,255,255,.4)' }}>
-              {lang === 'bn' ? 'ফর্ম ধাপ' : 'Form Steps'}
+          <nav
+            className="shell-sidebar no-print"
+            aria-label={lang === 'bn' ? 'ফর্ম ধাপ নেভিগেশন' : 'Form step navigation'}
+            style={{
+              background: T.sidebarBg, display: 'flex', flexDirection: 'column',
+              borderRight: `0.5px solid rgba(255,255,255,.06)`,
+              overflow: 'hidden', minHeight: 0,
+            }}
+          >
+            <div style={{ flexShrink: 0, padding: '14px 14px 8px', fontSize: 10, fontWeight: 500, letterSpacing: '.07em', textTransform: 'uppercase', color: T.sidebarLabel }}>
+              {lang === 'bn' ? 'ফর্ম ধাপ' : 'Form steps'}
             </div>
 
-            {/* Steps — scrollable if many steps */}
+            {/* Steps */}
             <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
               {steps.map((step, i) => {
                 const isActive = activeStep === step.id;
                 const isDone   = i < currentIdx;
                 return (
-                  <button key={step.id} className="shell-step" onClick={() => onStepChange(step.id)} style={{
-                    display: 'flex', alignItems: 'center', gap: 9,
-                    padding: '9px 14px', border: 'none', cursor: 'pointer', fontFamily: font,
-                    background: isActive ? 'rgba(255,255,255,.12)' : 'transparent',
-                    borderLeft: `2.5px solid ${isActive ? '#60a5fa' : isDone ? '#34d39888' : 'transparent'}`,
-                    color: isActive ? '#fff' : isDone ? '#6ee7b7' : 'rgba(255,255,255,.55)',
-                    textAlign: 'left', width: '100%', transition: 'all .12s',
-                  }}>
-                    <i className={`ti ${step.icon}`} style={{ fontSize: 16, flexShrink: 0 }}/>
-                    <span style={{ fontSize: 12, fontWeight: isActive ? 700 : 500, flex: 1, lineHeight: 1.3 }}>
+                  <button
+                    key={step.id}
+                    className="shell-step"
+                    onClick={() => onStepChange(step.id)}
+                    aria-current={isActive ? 'step' : undefined}
+                    style={sbBtn(isActive, isDone)}
+                  >
+                    <i className={`ti ${step.icon}`} style={{ fontSize: 16, flexShrink: 0 }} aria-hidden="true" />
+                    <span style={{ fontSize: 12, fontWeight: isActive ? 500 : 400, flex: 1, lineHeight: 1.3 }}>
                       {step.label}
                     </span>
                     {step.fieldCount !== undefined && (
@@ -537,7 +855,9 @@ export default function ModuleShell({
                         {step.fieldCount}
                       </span>
                     )}
-                    {isDone && !isActive && <span style={{ fontSize: 11, color: '#34d399' }}>✓</span>}
+                    {isDone && !isActive && (
+                      <span aria-label="সম্পন্ন" style={{ fontSize: 11, color: T.sidebarDone }}>✓</span>
+                    )}
                   </button>
                 );
               })}
@@ -545,58 +865,48 @@ export default function ModuleShell({
               {/* Bill links */}
               {billItems && billItems.length > 0 && (
                 <>
-                  <div style={{ height: '0.5px', background: 'rgba(255,255,255,.1)', margin: '8px 14px' }}/>
-                  <div style={{ padding: '4px 14px 6px', fontSize: 10, fontWeight: 700, letterSpacing: '.07em', textTransform: 'uppercase', color: 'rgba(255,255,255,.4)' }}>
+                  <div style={{ height: '.5px', background: 'rgba(255,255,255,.08)', margin: '8px 14px' }} aria-hidden="true" />
+                  <div style={{ padding: '4px 14px 6px', fontSize: 10, fontWeight: 500, letterSpacing: '.07em', textTransform: 'uppercase', color: T.sidebarLabel }}>
                     {lang === 'bn' ? 'আউটপুট' : 'Output'}
                   </div>
                   {billItems.map((item, i) => {
-                    const hasSubItems = item.subItems && item.subItems.length > 0;
-                    const isExpanded  = expandedBillIdx === i;
+                    const hasSub    = item.subItems && item.subItems.length > 0;
+                    const isExpanded = expandedBillIdx === i;
                     return (
                       <div key={i}>
                         <button
                           className="shell-step"
                           onClick={() => {
-                            if (hasSubItems) {
-                              // Toggle this item's dropdown; collapse others
-                              setExpandedBillIdx(isExpanded ? null : i);
-                            } else {
-                              // No sub-items — navigate directly
-                              item.onClick();
-                              setExpandedBillIdx(null);
-                            }
+                            if (hasSub) setExpandedBillIdx(isExpanded ? null : i);
+                            else { item.onClick(); setExpandedBillIdx(null); }
                           }}
+                          aria-expanded={hasSub ? isExpanded : undefined}
                           style={{
-                            display: 'flex', alignItems: 'center', gap: 9,
+                            display: 'flex', alignItems: 'center', gap: 9, justifyContent: 'space-between',
                             padding: '8px 14px', border: 'none', cursor: 'pointer', fontFamily: font,
-                            background: isBillActive && isExpanded ? 'rgba(255,255,255,.08)' : 'transparent',
-                            borderLeft: '2.5px solid transparent',
-                            color: 'rgba(255,255,255,.55)', textAlign: 'left', width: '100%',
-                            justifyContent: 'space-between',
+                            background: 'transparent', borderLeft: '2.5px solid transparent',
+                            color: T.sidebarText, textAlign: 'left', width: '100%',
                           }}
                         >
                           <span style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-                            <i className="ti ti-file-invoice" style={{ fontSize: 15, flexShrink: 0 }}/>
-                            <span style={{ fontSize: 12, fontWeight: 500 }}>{item.label}</span>
+                            <i className="ti ti-file-invoice" style={{ fontSize: 15, flexShrink: 0 }} aria-hidden="true" />
+                            <span style={{ fontSize: 12, fontWeight: 400 }}>{item.label}</span>
                           </span>
-                          {hasSubItems && (
-                            <span style={{ fontSize: 10, opacity: .6, transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }}>▾</span>
+                          {hasSub && (
+                            <span aria-hidden="true" style={{ fontSize: 10, opacity: .6, transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }}>▾</span>
                           )}
                         </button>
-                        {isExpanded && hasSubItems && (
+                        {isExpanded && hasSub && (
                           <div style={{ paddingLeft: 14, paddingBottom: 2 }}>
                             {item.subItems!.map((sub, j) => (
                               <button key={j} onClick={() => { sub.onClick(); item.onClick(); }} style={{
                                 display: 'block', width: '100%',
-                                padding: '4px 10px 4px 24px',
-                                border: 'none', cursor: 'pointer', fontFamily: font,
-                                background: sub.active ? 'rgba(255,255,255,.15)' : 'transparent',
-                                borderLeft: `2px solid ${sub.active ? '#60a5fa' : 'rgba(255,255,255,.2)'}`,
+                                padding: '4px 10px 4px 24px', border: 'none', cursor: 'pointer',
+                                fontFamily: font, fontSize: 11, textAlign: 'left',
+                                background: sub.active ? 'rgba(255,255,255,.12)' : 'transparent',
+                                borderLeft: `2px solid ${sub.active ? T.sidebarBorder : 'rgba(255,255,255,.18)'}`,
                                 color: sub.active ? '#fff' : 'rgba(255,255,255,.45)',
-                                fontSize: 11,
-                                fontWeight: sub.active ? 700 : 400,
-                                textAlign: 'left',
-                                borderRadius: '0 4px 4px 0',
+                                fontWeight: sub.active ? 500 : 400, borderRadius: '0 4px 4px 0',
                               }}>
                                 {sub.label}
                               </button>
@@ -610,199 +920,249 @@ export default function ModuleShell({
               )}
             </div>
 
-            {/* Save / Reset — pinned to bottom, never scrolls away */}
-            <div style={{ flexShrink: 0, padding: '12px 10px 14px', display: 'flex', flexDirection: 'column', gap: 6, borderTop: '1px solid rgba(255,255,255,.07)' }}>
-              {onSave && (<button onClick={handleSave}
-                disabled={!!(isSaving || saveDisabled || !configured)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center',
-                  padding: '9px 10px', borderRadius: 8, border: 'none',
-                  background: saved ? '#16a34a' : editingId ? '#d97706' : '#2563eb',
-                  color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                  fontFamily: font, opacity: (isSaving || saveDisabled || !configured) ? .55 : 1,
-                  transition: 'all .15s',
-                }}
-                title={!configured ? `${adapterName} কনফিগার নেই` : undefined}
-              >
-                {isSaving
-                  ? <span style={{ animation: 'shellSpin .8s linear infinite', display: 'inline-block' }}>⟳</span>
-                  : <FaSave style={{ fontSize: 12 }}/>}
-                {saved
-                  ? (lang === 'bn' ? '✓ সংরক্ষিত' : '✓ Saved')
-                  : isSaving ? '...'
-                  : editingId ? (lang === 'bn' ? 'আপডেট করুন' : 'Update')
-                  : (lang === 'bn' ? 'সংরক্ষণ করুন' : 'Save')}
-              </button>
+            {/* Sidebar actions pinned at bottom */}
+            <div style={{ flexShrink: 0, padding: '12px 10px 14px', display: 'flex', flexDirection: 'column', gap: 6, borderTop: '0.5px solid rgba(255,255,255,.07)' }}>
+              {onSave && (
+                <button
+                  onClick={handleSave}
+                  disabled={!!(isSaving || saveDisabled || !configured)}
+                  aria-label={lang === 'bn' ? 'সংরক্ষণ করুন' : 'Save record'}
+                  title={!configured ? `${adapterName} কনফিগার নেই` : undefined}
+                  style={actionBtn(
+                    saved ? '#16A34A' : editingId ? '#D97706' : T.btnPri,
+                    '#fff',
+                    undefined,
+                    !!(isSaving || saveDisabled || !configured),
+                  )}
+                  onFocus={e => e.currentTarget.style.boxShadow = `0 0 0 3px ${T.sidebarBorder}55`}
+                  onBlur={e => e.currentTarget.style.boxShadow = 'none'}
+                >
+                  {isSaving
+                    ? <span aria-hidden="true" style={{ animation: 'shellSpin .8s linear infinite', display: 'inline-block' }}>⟳</span>
+                    : <FaSave aria-hidden="true" style={{ fontSize: 12 }} />}
+                  {saved
+                    ? (lang === 'bn' ? '✓ সংরক্ষিত' : '✓ Saved')
+                    : isSaving ? '...'
+                    : editingId ? (lang === 'bn' ? 'আপডেট করুন' : 'Update')
+                    : (lang === 'bn' ? 'সংরক্ষণ করুন' : 'Save')}
+                </button>
               )}
+
               {onUpdate && (
-                <button onClick={() => onUpdateSearch ? onUpdateSearch() : setShowUpdate(true)} style={{
-                  display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center',
-                  padding: '7px 10px', borderRadius: 8,
-                  border: '1px solid rgba(245,158,11,.45)',
-                  background: 'transparent', color: '#f59e0b',
-                  fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: font,
-                }}>
-                  <FaSearch style={{ fontSize: 11 }}/> 
+                <button
+                  onClick={() => onUpdateSearch ? onUpdateSearch() : setShowUpdate(true)}
+                  aria-label={lang === 'bn' ? 'রেকর্ড খুঁজে আপডেট করুন' : 'Search to update'}
+                  style={actionBtn('transparent', T.btnWarnText, T.btnWarnBorder)}
+                  onFocus={e => e.currentTarget.style.boxShadow = `0 0 0 3px ${T.warning.dot}33`}
+                  onBlur={e => e.currentTarget.style.boxShadow = 'none'}
+                >
+                  <FaSearch aria-hidden="true" style={{ fontSize: 11 }} />
                   {lang === 'bn' ? 'আপডেট সার্চ' : 'Search to update'}
                 </button>
               )}
+
               {onReset && (
-                <button onClick={() => { if (window.confirm(lang === 'bn' ? 'রিসেট করবেন?' : 'Reset form?')) onReset(); }} style={{
-                  display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center',
-                  padding: '7px 10px', borderRadius: 8,
-                  border: '1px solid rgba(239,68,68,.3)',
-                  background: 'transparent', color: 'rgba(239,68,68,.8)',
-                  fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: font,
-                }}>
-                  <FaTimes style={{ fontSize: 11 }}/>
+                <button
+                  onClick={() => { if (window.confirm(lang === 'bn' ? 'রিসেট করবেন?' : 'Reset form?')) onReset(); }}
+                  aria-label={lang === 'bn' ? 'ফর্ম রিসেট করুন' : 'Reset form'}
+                  style={actionBtn('transparent', T.btnDangerText, T.btnDangerBorder)}
+                  onFocus={e => e.currentTarget.style.boxShadow = `0 0 0 3px ${T.danger.dot}33`}
+                  onBlur={e => e.currentTarget.style.boxShadow = 'none'}
+                >
+                  <FaTimes aria-hidden="true" style={{ fontSize: 11 }} />
                   {lang === 'bn' ? 'রিসেট' : 'Reset'}
                 </button>
               )}
             </div>
-          </div>
+          </nav>
         )}
 
-        {/* ── ZONE C: Form content — scrolls internally ─────────────────── */}
-        <div className="shell-content" style={{
-          background: '#fff',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',   // column clips; inner area scrolls
-          minHeight: 0,
-        }}>
-
-          {/* Editing banner — fixed, never scrolls */}
+        {/* ── FORM CONTENT ──────────────────────────────────────────────── */}
+        <main
+          className="shell-content"
+          style={{ background: T.cardBg, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}
+        >
+          {/* Edit mode banner */}
           {editingId && (
-            <div className="no-print" style={{ flexShrink: 0, background: '#fffbeb', borderBottom: '1.5px solid #fde68a', padding: '6px 20px', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#92400e', fontFamily: font }}>
-              <FaEdit style={{ fontSize: 12 }}/>
+            <div
+              role="status"
+              className="no-print"
+              style={{
+                flexShrink: 0, background: T.editBg,
+                borderBottom: `1.5px solid ${T.editBorder}`,
+                padding: '6px 20px', display: 'flex', alignItems: 'center',
+                gap: 8, fontSize: 12, color: T.editText, fontFamily: font,
+              }}
+            >
+              <FaEdit aria-hidden="true" style={{ fontSize: 12 }} />
               <span>{lang === 'bn' ? 'সম্পাদনা মোড —' : 'Editing —'} <strong>{editingId}</strong></span>
               {onCancelEdit && (
-                <button onClick={onCancelEdit} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#b45309', fontSize: 12, fontWeight: 600, fontFamily: font, display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <FaTimes/> {lang === 'bn' ? 'বাতিল' : 'Cancel'}
+                <button
+                  onClick={onCancelEdit}
+                  aria-label={lang === 'bn' ? 'সম্পাদনা বাতিল করুন' : 'Cancel editing'}
+                  style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: T.editText, fontSize: 12, fontWeight: 500, fontFamily: font, display: 'flex', alignItems: 'center', gap: 4 }}
+                >
+                  <FaTimes aria-hidden="true" /> {lang === 'bn' ? 'বাতিল' : 'Cancel'}
                 </button>
               )}
             </div>
           )}
 
-          {/* Step heading — fixed, never scrolls */}
+          {/* Step heading + progress bar */}
           {!isBillActive && currentIdx >= 0 && (
             <div className="no-print" style={{ flexShrink: 0, padding: '14px 20px 0', display: 'flex', alignItems: 'center', gap: 8 }}>
-              <i className={`ti ${steps[currentIdx]?.icon}`} style={{ fontSize: 18, color: '#1e3a5f' }}/>
-              <span style={{ fontSize: 15, fontWeight: 700, color: '#1e3a5f' }}>{steps[currentIdx]?.label}</span>
-              <div style={{ flex: 1, height: 3, background: '#f1f5f9', borderRadius: 2, marginLeft: 8, overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: `${((currentIdx + 1) / steps.length) * 100}%`, background: '#1e40af', borderRadius: 2, transition: 'width .3s ease' }}/>
+              <i className={`ti ${steps[currentIdx]?.icon}`} style={{ fontSize: 18, color: T.stepText }} aria-hidden="true" />
+              <span style={{ fontSize: 15, fontWeight: 500, color: T.stepText }}>{steps[currentIdx]?.label}</span>
+              <div
+                role="progressbar"
+                aria-valuenow={currentIdx + 1}
+                aria-valuemin={1}
+                aria-valuemax={steps.length}
+                aria-label={`Step ${currentIdx + 1} of ${steps.length}`}
+                style={{ flex: 1, height: 3, background: T.progBg, borderRadius: 2, marginLeft: 8, overflow: 'hidden' }}
+              >
+                <div style={{ height: '100%', width: `${((currentIdx + 1) / steps.length) * 100}%`, background: T.progFill, borderRadius: 2, transition: 'width .3s ease' }} />
               </div>
-              <span style={{ fontSize: 11, color: '#94a3b8', whiteSpace: 'nowrap' }}>
+              <span style={{ fontSize: 11, color: T.textMut, whiteSpace: 'nowrap' }}>
                 {currentIdx + 1}/{steps.length}
               </span>
             </div>
           )}
 
-          {/* Tab content — the ONLY scrolling region in Zone C */}
+          {/* Tab content — scrollable */}
           <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', minHeight: 0 }}>
             {children}
           </div>
 
-          {/* Prev / Next — fixed at bottom, never scrolls away */}
+          {/* Prev / Next footer */}
           {!isBillActive && !hideStepNav && (
-            <div className="no-print" style={{ flexShrink: 0, padding: '12px 20px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f1f5f9' }}>
+            <div
+              className="no-print"
+              style={{
+                flexShrink: 0, padding: '10px 20px 14px',
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                borderTop: `0.5px solid ${T.cardBorder}`,
+              }}
+            >
               <button
                 onClick={() => hasPrev && onStepChange(steps[currentIdx - 1].id)}
                 disabled={!hasPrev}
-                style={{ ...S.btn(false, '#475569'), opacity: hasPrev ? 1 : .35 }}
+                aria-label={lang === 'bn' ? 'পূর্ববর্তী ধাপ' : 'Previous step'}
+                style={{ ...outBtn, opacity: hasPrev ? 1 : .35 }}
               >
                 ← {lang === 'bn' ? 'পূর্ববর্তী' : 'Previous'}
               </button>
+
               {mobile && onSave && (
-                <button onClick={handleSave}
+                <button
+                  onClick={handleSave}
                   disabled={!!(isSaving || saveDisabled || !configured)}
-                  style={{ ...S.btn(true, saved ? '#16a34a' : editingId ? '#d97706' : '#1e40af') }}>
-                  {isSaving ? '⟳' : <FaSave style={{ fontSize: 11 }}/>}
+                  style={{
+                    ...btnBase(T),
+                    background: saved ? '#16A34A' : editingId ? '#D97706' : T.btnPri,
+                    color: T.btnPriText,
+                  }}
+                >
+                  {isSaving ? '⟳' : <FaSave aria-hidden="true" style={{ fontSize: 11 }} />}
                   {saved ? (lang === 'bn' ? '✓ সংরক্ষিত' : '✓ Saved') : (lang === 'bn' ? 'সংরক্ষণ' : 'Save')}
                 </button>
               )}
+
               <button
                 onClick={() => hasNext && onStepChange(steps[currentIdx + 1].id)}
                 disabled={!hasNext}
-                style={{ ...S.btn(hasNext, '#1e40af'), opacity: hasNext ? 1 : .35 }}
+                aria-label={lang === 'bn' ? 'পরবর্তী ধাপ' : 'Next step'}
+                style={{
+                  ...outBtn, opacity: hasNext ? 1 : .35,
+                  background: hasNext ? T.btnPri : T.btnOutBg,
+                  color: hasNext ? T.btnPriText : T.btnOutText,
+                  outline: hasNext ? 'none' : `0.5px solid ${T.btnOutBorder}`,
+                }}
               >
                 {lang === 'bn' ? 'পরবর্তী' : 'Next'} →
               </button>
             </div>
           )}
-        </div>
+        </main>
 
-        {/* ── ZONE D + E: Right panel — scrolls internally ──────────────── */}
+        {/* ── RIGHT PANEL ───────────────────────────────────────────────── */}
         {!mobile && (
-          <div className="shell-right no-print" style={{
-            background: '#f8fafc',
-            borderLeft: '1px solid #e2e8f0',
-            display: 'flex',
-            flexDirection: 'column',
-            fontSize: 12,
-            overflow: 'hidden',   // column clips
-            minHeight: 0,
-          }}>
-
-            {/* Zone D: Live calculation — fixed height, no scroll */}
+          <aside
+            className="shell-right no-print"
+            aria-label={lang === 'bn' ? 'হিসাব ও রেকর্ড প্যানেল' : 'Calculation and records panel'}
+            style={{
+              background: T.rightBg, borderLeft: `0.5px solid ${T.rightBorder}`,
+              display: 'flex', flexDirection: 'column', fontSize: 12,
+              overflow: 'hidden', minHeight: 0,
+            }}
+          >
+            {/* Live calculation */}
             {(calcRows?.length || totalRow) && (
-              <div style={{ flexShrink: 0, padding: '12px 14px', borderBottom: '1px solid #e2e8f0' }}>
-                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.07em', textTransform: 'uppercase', color: '#94a3b8', marginBottom: 10 }}>
-                  {lang === 'bn' ? 'লাইভ হিসাব' : 'Live Calculation'}
+              <div style={{ flexShrink: 0, padding: '12px 14px', borderBottom: `0.5px solid ${T.rightBorder}` }}>
+                <div style={{ fontSize: 10, fontWeight: 500, letterSpacing: '.07em', textTransform: 'uppercase', color: T.rightLabel, marginBottom: 10 }}>
+                  {lang === 'bn' ? 'লাইভ হিসাব' : 'Live calculation'}
                 </div>
                 {calcRows?.map((row, i) => (
-                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', color: row.muted ? '#94a3b8' : '#374151' }}>
-                    <span style={{ color: '#6b7280' }}>{row.label}</span>
-                    <span style={{ fontWeight: 600 }}>{row.value}</span>
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', color: row.muted ? T.textMut : T.textSec }}>
+                    <span style={{ color: T.textMut }}>{row.label}</span>
+                    <span style={{ fontWeight: 500, color: T.text }}>{row.value}</span>
                   </div>
                 ))}
                 {totalRow && (
                   <div style={{
                     display: 'flex', justifyContent: 'space-between',
                     marginTop: 8, padding: '8px 10px', borderRadius: 8,
-                    background: totalBg ?? '#0f2442', color: '#fff',
+                    background: T.calcTotalBg, color: '#fff',
                   }}>
-                    <span style={{ fontWeight: 600, fontSize: 13 }}>{totalRow.label}</span>
-                    <span style={{ fontWeight: 800, fontSize: 14 }}>{totalRow.value}</span>
+                    <span style={{ fontWeight: 500, fontSize: 13 }}>{totalRow.label}</span>
+                    <span style={{ fontWeight: 500, fontSize: 14 }}>{totalRow.value}</span>
                   </div>
                 )}
               </div>
             )}
 
-            {/* Zone E: History — flex-grows and scrolls internally */}
+            {/* Saved records */}
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
               <div
                 style={{ flexShrink: 0, padding: '10px 14px 8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
                 onClick={() => setHistExpanded(v => !v)}
+                role="button"
+                tabIndex={0}
+                aria-expanded={histExpanded}
+                onKeyDown={e => e.key === 'Enter' && setHistExpanded(v => !v)}
               >
-                <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.07em', textTransform: 'uppercase', color: '#94a3b8' }}>
-                  {lang === 'bn' ? 'সংরক্ষিত রেকর্ড' : 'Saved Records'}
+                <span style={{ fontSize: 10, fontWeight: 500, letterSpacing: '.07em', textTransform: 'uppercase', color: T.rightLabel }}>
+                  {lang === 'bn' ? 'সংরক্ষিত রেকর্ড' : 'Saved records'}
                   {records.length > 0 && (
-                    <span style={{ marginLeft: 6, background: '#e2e8f0', borderRadius: 10, padding: '1px 6px', fontSize: 10, color: '#475569' }}>{records.length}</span>
+                    <span style={{ marginLeft: 6, background: T.tblHead, borderRadius: 10, padding: '1px 6px', fontSize: 10, color: T.textSec }}>
+                      {records.length}
+                    </span>
                   )}
                 </span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   {onReload && (
-                    <button onClick={e => { e.stopPropagation(); onReload(); }}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: 2 }} title={lang === 'bn' ? 'পুনরায় লোড' : 'Reload'}>
-                      <FaSyncAlt style={{ fontSize: 11 }}/>
+                    <button
+                      onClick={e => { e.stopPropagation(); onReload(); }}
+                      aria-label={lang === 'bn' ? 'পুনরায় লোড করুন' : 'Reload records'}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textMut, padding: 2 }}
+                    >
+                      <FaSyncAlt aria-hidden="true" style={{ fontSize: 11 }} />
                     </button>
                   )}
-                  <FaChevronDown style={{ fontSize: 10, color: '#94a3b8', transform: histExpanded ? 'rotate(180deg)' : 'none', transition: '.15s' }}/>
+                  <FaChevronDown aria-hidden="true" style={{ fontSize: 10, color: T.textMut, transform: histExpanded ? 'rotate(180deg)' : 'none', transition: '.15s' }} />
                 </div>
               </div>
 
-              {/* Record list — the ONLY scrolling region in Zone E */}
               {histExpanded && (
                 <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
                   {isLoading && (
-                    <div style={{ padding: '16px', textAlign: 'center', color: '#94a3b8' }}>
-                      <span style={{ animation: 'shellSpin .8s linear infinite', display: 'inline-block' }}>⟳</span>
+                    <div style={{ padding: 16, textAlign: 'center', color: T.textMut }} role="status" aria-label="লোড হচ্ছে">
+                      <span aria-hidden="true" style={{ animation: 'shellSpin .8s linear infinite', display: 'inline-block' }}>⟳</span>
                     </div>
                   )}
                   {!isLoading && records.length === 0 && (
-                    <div style={{ padding: '16px 14px', textAlign: 'center', color: '#cbd5e1', fontSize: 12 }}>
-                      <FaDatabase style={{ fontSize: 20, marginBottom: 6, display: 'block', margin: '0 auto 6px' }}/>
+                    <div style={{ padding: '16px 14px', textAlign: 'center', color: T.textMut, fontSize: 12 }}>
+                      <FaDatabase aria-hidden="true" style={{ fontSize: 20, marginBottom: 6, display: 'block', margin: '0 auto 6px' }} />
                       {lang === 'bn' ? 'কোনো রেকর্ড নেই' : 'No records yet'}
                     </div>
                   )}
@@ -812,28 +1172,42 @@ export default function ModuleShell({
                       ? recordLabel(rec)
                       : String(rec.employeeName ?? rec.fullName ?? rec.subject ?? rec.id ?? '—');
                     return (
-                      <div key={String(rec.id)} className="shell-hist-row" style={{
-                        display: 'flex', alignItems: 'center', gap: 8,
-                        padding: '7px 14px', borderBottom: '1px solid #f1f5f9',
-                        cursor: 'pointer',
-                        background: isEditing ? '#fffbeb' : undefined,
-                        borderLeft: isEditing ? '2.5px solid #f59e0b' : '2.5px solid transparent',
-                      }} onClick={() => onLoadRecord?.(rec as unknown as Record<string, unknown>)}>
+                      <div
+                        key={String(rec.id)}
+                        className="shell-hist-row"
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 8,
+                          padding: '7px 14px', borderBottom: `0.5px solid ${T.rightBorder}`,
+                          cursor: 'pointer',
+                          background: isEditing ? T.editBg : undefined,
+                          borderLeft: isEditing ? `2.5px solid ${T.warning.dot}` : '2.5px solid transparent',
+                        }}
+                        onClick={() => onLoadRecord?.(rec as unknown as Record<string, unknown>)}
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`${lang === 'bn' ? 'রেকর্ড লোড করুন' : 'Load record'}: ${name}`}
+                        onKeyDown={e => e.key === 'Enter' && onLoadRecord?.(rec as unknown as Record<string, unknown>)}
+                      >
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontWeight: 600, fontSize: 12, color: isEditing ? '#92400e' : '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {isEditing && '✎ '}{name}
+                          <div style={{ fontWeight: 500, fontSize: 12, color: isEditing ? T.editText : T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {isEditing && <span aria-label="সম্পাদনা হচ্ছে">✎ </span>}{name}
                           </div>
-                          <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 1 }}>
+                          <div style={{ fontSize: 10, color: T.textMut, marginTop: 1 }}>
                             {formatSavedAt(String(rec.savedAt ?? ''))}
                           </div>
-                          {recordBadge && (
-                            <div style={{ marginTop: 4 }}>{recordBadge(rec)}</div>
-                          )}
+                          {recordBadge && <div style={{ marginTop: 4 }}>{recordBadge(rec)}</div>}
                         </div>
                         {onDeleteRecord && (
-                          <button onClick={e => { e.stopPropagation(); if (window.confirm(lang === 'bn' ? 'মুছবেন?' : 'Delete?')) onDeleteRecord(String(rec.id)); }}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#fca5a5', padding: 3, flexShrink: 0 }}>
-                            <FaTrash style={{ fontSize: 11 }}/>
+                          <button
+                            onClick={e => {
+                              e.stopPropagation();
+                              if (window.confirm(lang === 'bn' ? 'মুছবেন?' : 'Delete?'))
+                                onDeleteRecord(String(rec.id));
+                            }}
+                            aria-label={`${lang === 'bn' ? 'মুছুন' : 'Delete'}: ${name}`}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.danger.dot, padding: 3, flexShrink: 0 }}
+                          >
+                            <FaTrash aria-hidden="true" style={{ fontSize: 11 }} />
                           </button>
                         )}
                       </div>
@@ -843,28 +1217,31 @@ export default function ModuleShell({
               )}
             </div>
 
-            {/* Output / auth buttons — pinned to bottom, never scrolls away */}
-            <div style={{ flexShrink: 0, borderTop: '1px solid #e2e8f0', padding: '10px 14px' }}>
-              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.07em', textTransform: 'uppercase', color: '#94a3b8', marginBottom: 8 }}>
-                {lang === 'bn' ? 'অনুমোদন ও প্রিন্ট' : 'Approval & Output'}
+            {/* Output / approval buttons */}
+            <div style={{ flexShrink: 0, borderTop: `0.5px solid ${T.rightBorder}`, padding: '10px 14px' }}>
+              <div style={{ fontSize: 10, fontWeight: 500, letterSpacing: '.07em', textTransform: 'uppercase', color: T.rightLabel, marginBottom: 8 }}>
+                {lang === 'bn' ? 'অনুমোদন ও প্রিন্ট' : 'Approval and output'}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {auth && onAuthChange && (
-                  <div><AuthorityIconButton value={auth} onChange={onAuthChange} lang={lang}/></div>
+                  <div><AuthorityIconButton value={auth} onChange={onAuthChange} lang={lang} /></div>
                 )}
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                   {onPrint && (
-                    <button onClick={onPrint} style={S.iconBtn()}>
-                      <FaPrint style={{ fontSize: 11 }}/> 
+                    <button
+                      onClick={onPrint}
+                      aria-label={lang === 'bn' ? 'প্রিন্ট করুন' : 'Print'}
+                      style={outBtn}
+                    >
+                      <FaPrint aria-hidden="true" style={{ fontSize: 11 }} />
                       {lang === 'bn' ? 'প্রিন্ট' : 'Print'}
                     </button>
                   )}
-                  <ExportMenu onPDF={onPDF} onExcel={onExcel} onWord={onWord} lang={lang}/>
+                  <ExportMenu onPDF={onPDF} onExcel={onExcel} onWord={onWord} lang={lang} T={T} />
                 </div>
               </div>
             </div>
-
-          </div>
+          </aside>
         )}
       </div>
 
@@ -877,6 +1254,7 @@ export default function ModuleShell({
           factoryId={factory.id}
           label={updateLabel}
           placeholder={updateSearchPlaceholder}
+          T={T}
         />
       )}
     </div>

@@ -12,7 +12,7 @@
 // to PRIMARY_FACTORY if the id is unknown, preventing data leakage.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type { FactoryConfig, FactoryAuthorities, WorkerProfile, WelfareOfficer, HotLine, Committee, CommitteeMember, MeetingAuthority } from './FactoryTypes';
+export type { FactoryConfig, FactoryAuthorities, WorkerProfile, WelfareOfficer, HotLine, Committee, CommitteeMember, MeetingAuthority, WorkerGuideline, WorkerGuidelineConfig, SalaryBreakdown, LeaveInfo } from './FactoryTypes';
 
 // ── Import every factory file ─────────────────────────────────────────────────
 import { MG_SHIRTEX  } from './MgShirtex';

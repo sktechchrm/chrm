@@ -6,7 +6,7 @@
 //
 // CHANGES vs previous version:
 //  - localStorage persistence removed → real database persistence via
-//    useSheetsSync('leftnotice', ...), matching every other module.
+//    useDatabase('leftnotice', ...), matching every other module.
 //  - Custom <nav> tab bar replaced by ModuleShell's steps + billItems.
 //  - Added EmployeeSearchBar for card-no auto-fill (was completely absent
 //    from the live flow before — only existed in the dead App in
@@ -26,12 +26,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth }                  from '../../context/AuthContext';
 import { useFactory }                from '../../hooks/useFactory';
-import { useSheetsSync }             from '../../hooks/useSheetsSync';
+import { useDatabase }             from '../../hooks/useDatabase';
 import { toDateInput }               from '../../utils/dateUtils';
 import ModuleShell                   from '../shell/ModuleShell';
 import { DEFAULT_AUTHORIZATION }     from '../common/AuthorizationBlock';
 import type { AuthorizationState }   from '../common/AuthorizationBlock';
-import EmployeeSearchBar             from '../common/EmployeeSearchBar';
 import { Employee, initialEmployee, toBanglaNumber } from '../../types/LeftNoticeDataType';
 import { EmployeeForm }              from './EmployeeInfoForm';
 import { NoticeLetter }              from './EmployeeNotice';
@@ -42,8 +41,8 @@ import { BASE_PRINT_CSS, PAGE_A4_PORTRAIT } from '../../utils/printCSS';
 // ── Steps & output items ───────────────────────────────────────────────────
 
 const STEPS = [
-  { id: 'personal', label: 'সাধারণ তথ্য', icon: 'ti-user-circle', fieldCount: 7 },
-  { id: 'address',  label: 'ঠিকানা',      icon: 'ti-map-pin',     fieldCount: 8 },
+  { id: 'personal', label: 'সাধারণ তথ্য', icon: 'ti-user-circle' },
+  { id: 'address',  label: 'ঠিকানা',      icon: 'ti-map-pin' },
 ];
 
 type FormStepId = 'personal' | 'address';
@@ -84,7 +83,7 @@ function NoticeView() {
   const factory  = useFactory();
   const { user } = useAuth();
 
-  const sheets  = useSheetsSync('leftnotice', factory.id, user?.name ?? 'unknown');
+  const sheets  = useDatabase('leftnotice', factory.id, user?.name ?? 'unknown');
   const viewRef = useRef<HTMLDivElement>(null);
 
   // "Prepared By" is always hidden for this module (hidePrepared on
@@ -93,6 +92,7 @@ function NoticeView() {
   // checkboxes every other module uses — the user can show just one (it
   // sits left-aligned), two (spread left/right), or all four.
   const [authorization, setAuthorization] = useState<AuthorizationState>(DEFAULT_AUTHORIZATION);
+  const [touched,   setTouched]   = useState(false);
   const [activeView,    setActiveView]    = useState<ViewId>('personal');
   const [employee,      setEmployee]      = useState<Employee>(initialEmployee);
 
@@ -112,6 +112,7 @@ function NoticeView() {
 
   // ── Reset ─────────────────────────────────────────────────────────────────
   const handleReset = () => {
+    setTouched(false);
     setEmployee(prev => ({
       ...initialEmployee,
       // Keep factory data from session
@@ -210,6 +211,7 @@ function NoticeView() {
 
         editingId={sheets.editingId}
         onCancelEdit={handleReset}
+        isDirty={touched}
         onReset={handleReset}
 
         onUpdate={rec => {
@@ -246,20 +248,13 @@ function NoticeView() {
       >
         {(activeView === 'personal' || activeView === 'address') && (
           <>
-            {activeView === 'personal' && (
-              <EmployeeSearchBar
-                factoryId={factory?.id || ''}
-                initialCardNo={employee.cardNo}
-                onFound={data => setEmployee(prev => ({
-                  ...prev,
-                  name:        data.fullName,
-                  cardNo:      data.cardNo,
-                  designation: data.designation,
-                  section:     data.department,
-                }))}
-              />
-            )}
-            <EmployeeForm employee={employee} onChange={setEmployee} activeTab={activeView} />
+            <EmployeeForm
+              key={sheets.editingId ?? 'new'}
+              employee={employee}
+              onChange={data => { setTouched(true); setEmployee(data); }}
+              activeTab={activeView}
+              onDirtyChange={dirty => { if (dirty) setTouched(true); }}
+            />
           </>
         )}
 

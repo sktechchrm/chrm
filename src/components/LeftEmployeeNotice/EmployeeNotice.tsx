@@ -218,10 +218,11 @@ const getNoticeDates = () => {
                 <h3 className="font-bold text-base border-b-2 border-black pb-1 mb-1 print:border-black">
                   বর্তমান ঠিকানা
                 </h3>
-                <p className="text-xs sm:text-sm">গ্রাম: {employee.presentAddress.village || '-'}</p>
-                <p className="text-xs sm:text-sm">ডাকঘর: {employee.presentAddress.postOffice || '-'}</p>
-                <p className="text-xs sm:text-sm">থানা: {employee.presentAddress.thana || '-'}</p>
-                <p className="text-xs sm:text-sm">জেলা: {employee.presentAddress.district || '-'}</p>
+{employee.presentAddress.houseNo && <p className="text-xs sm:text-sm">বাড়ি: {employee.presentAddress.houseNo}</p>}
+                {employee.presentAddress.village && <p className="text-xs sm:text-sm">গ্রাম: {employee.presentAddress.village}</p>}
+                {employee.presentAddress.postOffice && <p className="text-xs sm:text-sm">ডাকঘর: {employee.presentAddress.postOffice}</p>}
+                {employee.presentAddress.thana && <p className="text-xs sm:text-sm">থানা: {employee.presentAddress.thana}</p>}
+                {employee.presentAddress.district && <p className="text-xs sm:text-sm">জেলা: {employee.presentAddress.district}</p>}
               </div>
 
               {/* Column 3 - Permanent Address */}
@@ -229,10 +230,11 @@ const getNoticeDates = () => {
                 <h3 className="font-bold text-base border-b-2 border-black pb-1 mb-1 print:border-black">
                   স্থায়ী ঠিকানা
                 </h3>
-                <p className="text-xs sm:text-sm">গ্রাম: {employee.permanentAddress.village || '-'}</p>
-                <p className="text-xs sm:text-sm">ডাকঘর: {employee.permanentAddress.postOffice || '-'}</p>
-                <p className="text-xs sm:text-sm">থানা: {employee.permanentAddress.thana || '-'}</p>
-                <p className="text-xs sm:text-sm">জেলা: {employee.permanentAddress.district || '-'}</p>
+{employee.permanentAddress.houseNo && <p className="text-xs sm:text-sm">বাড়ি: {employee.permanentAddress.houseNo}</p>}
+                {employee.permanentAddress.village && <p className="text-xs sm:text-sm">গ্রাম: {employee.permanentAddress.village}</p>}
+                {employee.permanentAddress.postOffice && <p className="text-xs sm:text-sm">ডাকঘর: {employee.permanentAddress.postOffice}</p>}
+                {employee.permanentAddress.thana && <p className="text-xs sm:text-sm">থানা: {employee.permanentAddress.thana}</p>}
+                {employee.permanentAddress.district && <p className="text-xs sm:text-sm">জেলা: {employee.permanentAddress.district}</p>}
               </div>
 
             </div>

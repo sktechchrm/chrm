@@ -1,5 +1,6 @@
 // leftIndex.ts
 export interface Address {
+  houseNo: string;   // বাড়ি/বাড়ি নং/রাস্তা
   village: string;
   postOffice: string;
   thana: string;
@@ -46,12 +47,14 @@ export const initialEmployee: Employee = {
   companyName: '',        
   companyAddress: '',      
   presentAddress: {
+    houseNo: '',
     village: '',
     postOffice: '',
     thana: '',
     district: ''
   },
   permanentAddress: {
+    houseNo: '',
     village: '',
     postOffice: '',
     thana: '',
@@ -127,6 +130,7 @@ export const buildDateISO = ({ day, month, year }: DateParts): string => {
 // Helper function to format address
 export const formatAddress = (address: Address): string => {
   const parts = [
+    address.houseNo && `বাড়ি: ${address.houseNo}`,
     address.village && `গ্রাম: ${address.village}`,
     address.postOffice && `ডাকঘর: ${address.postOffice}`,
     address.thana && `থানা: ${address.thana}`,

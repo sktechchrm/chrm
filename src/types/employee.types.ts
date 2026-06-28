@@ -1,4 +1,4 @@
-import { FACTORY_NAME_EN, FACTORY_NAME_BN, FACTORY_ADDRESS_EN, FACTORY_ADDRESS_BN, FACTORY_REGISTRY } from '../config/factory';
+import { FACTORY_NAME_EN, FACTORY_REGISTRY } from '../factories/FactoryRegistry';
 // employee.types.ts (Optimized & Standard)
 
 // ============= INTERFACES =============
@@ -20,15 +20,14 @@ export interface EducationEntry {
 export interface PreviousJobEntry {
   id: string;
   prevCompanyName: string;
-  prevServicePeriod: string;
   prevDesignation: string;
   prevSection: string;
   prevCompanyPhone: string;
-  prevStartDate: string;
+  prevServiceYears: string;   // চাকরির বছর
+  prevStartDate: string;      // শুরুর তারিখ (auto = endDate - serviceYears)
   prevEndDate: string;
   prevLeaveReason: string;
-  prevRefName: string;
-  prevRefPhone: string;
+  prevRefDetails: string;     // রেফারেন্স বিস্তারিত (single field)
 }
 
 export interface EmployeeFormData {
@@ -52,8 +51,10 @@ export interface EmployeeFormData {
   permanentAddress: string;
   mobile: string;
   email: string;
+  onnano: string;           // অন্যান্য যোগাযোগ
   
   // Present Address Details
+  presentHouseNo: string;   // বাড়ি / বাড়ি নং / রাস্তা
   presentUnion: string;
   presentVillage: string;
   presentPostOffice: string;
@@ -62,6 +63,7 @@ export interface EmployeeFormData {
   presentDivision: string;
   
   // Permanent Address Details
+  permanentHouseNo: string; // বাড়ি / বাড়ি নং / রাস্তা
   permanentUnion: string;
   permanentVillage: string;
   permanentPostOffice: string;
@@ -74,7 +76,8 @@ export interface EmployeeFormData {
   designation: string;
   department: string;
   joiningDate: string;
-  salary: string;
+  salary: string;           // হাজিরা বোনাস
+  grossSalary: string;       // মাসিক বেতন (মোট) — বেতন বিভাজন
   cardNo: string;
   idNo: string;
   proximityNumber: string;
@@ -98,6 +101,7 @@ export interface EmployeeFormData {
   // Documents
   birthRegistrationNo: string;
   passportNumber: string;
+  drivingLicense: string;    // ড্রাইভিং লাইসেন্স
   tinNumber: string;
   
   // Spouse Information
@@ -242,8 +246,10 @@ export const initialFormData: EmployeeFormData = {
   permanentAddress: '',
   mobile: '',
   email: '',
+  onnano: '',
   
   // Present Address
+  presentHouseNo: '',
   presentUnion: '',
   presentVillage: '',
   presentPostOffice: '',
@@ -252,6 +258,7 @@ export const initialFormData: EmployeeFormData = {
   presentDivision: '',
   
   // Permanent Address
+  permanentHouseNo: '',
   permanentUnion: '',
   permanentVillage: '',
   permanentPostOffice: '',
@@ -265,6 +272,7 @@ export const initialFormData: EmployeeFormData = {
   department: '',
   joiningDate: '',
   salary: String(DEFAULT_SALARY),
+  grossSalary: '',
   cardNo: '',
   idNo: '',
   proximityNumber: '',
@@ -288,6 +296,7 @@ export const initialFormData: EmployeeFormData = {
   // Documents
   birthRegistrationNo: '',
   passportNumber: '',
+  drivingLicense: '',
   tinNumber: '',
   
   // Spouse
@@ -409,7 +418,8 @@ export const calculateWageComponents = (
  * Get calculated salary breakdown
  */
 export const getSalaryBreakdown = (formData: EmployeeFormData): SalaryBreakdown => {
-  const totalSalary = parseNumber(formData.salary);
+  // grossSalary is the new বেতন বিভাজন field; fall back to salary if not set
+  const totalSalary = parseNumber((formData as any).grossSalary || formData.salary);
   const food = parseNumber(formData.foodAllowance);
   const medical = parseNumber(formData.medicalAllowance);
   const transport = parseNumber(formData.transportAllowance);

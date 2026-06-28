@@ -36,7 +36,7 @@ interface EnvelopeCardProps {
 function EnvelopeCard({ employee, address, addressLabel }: EnvelopeCardProps) {
   const factory = useFactory();
 
-  const addressLines = [address.village, address.postOffice, address.thana, address.district]
+  const addressLines = [address.houseNo, address.village, address.postOffice, address.thana, address.district]
     .filter(Boolean)
     .join(', ');
 

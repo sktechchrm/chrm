@@ -227,6 +227,7 @@ export interface ShellProps {
   editingId?:     string | null;
   onCancelEdit?:  () => void;
   onReset?:       () => void;
+  isDirty?:       boolean;
   onUpdate?:      (record: Record<string, unknown>) => void;
   onUpdateSearch?: () => void;
   updateModule?:  DbModule;
@@ -286,10 +287,6 @@ function btnBase(T: Theme): React.CSSProperties {
     transition: 'opacity .13s, box-shadow .13s',
     outline: 'none',
   };
-}
-
-function focusRing(color: string): React.CSSProperties {
-  return { boxShadow: `0 0 0 3px ${color}33` };
 }
 
 // ── Export dropdown ───────────────────────────────────────────────────────────
@@ -601,7 +598,8 @@ export default function ModuleShell({
   steps, activeStep, onStepChange,
   billItems, isBillActive,
   onSave, isSaving, saveDisabled, configured = true, adapterName = 'Database',
-  editingId, onCancelEdit, onReset, onUpdate, onUpdateSearch, updateModule, updateLabel, updateSearchPlaceholder,
+  editingId, onCancelEdit, onReset, isDirty,
+  onUpdate, onUpdateSearch, updateModule, updateLabel, updateSearchPlaceholder,
   children, hideStepNav,
   calcRows, totalRow,
   records = [], isLoading, onLoadRecord, onDeleteRecord, onReload,
@@ -674,7 +672,8 @@ export default function ModuleShell({
     bg: string, color: string, border?: string, disabled = false,
   ): React.CSSProperties => ({
     display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center',
-    padding: '8px 10px', borderRadius: 8,
+    padding: '10px 14px',
+    borderRadius: 8,
     border: border ? `1px solid ${border}` : 'none',
     background: bg, color,
     fontSize: 12, fontWeight: 500, cursor: disabled ? 'not-allowed' : 'pointer',
@@ -755,12 +754,8 @@ export default function ModuleShell({
               {date || '—'}
             </span>
           )}
-
-          {/* Dark/light toggle */}
           <ThemeToggle isDark={isDark} onToggle={toggle} />
-
-          {/* User avatar placeholder */}
-          {/* <div
+          <div
             style={{
               width: 30, height: 30, borderRadius: '50%',
               background: 'rgba(255,255,255,.15)',
@@ -771,7 +766,7 @@ export default function ModuleShell({
             title="User profile"
           >
             HR
-          </div> */}
+          </div>
         </div>
       </div>
 
@@ -963,7 +958,9 @@ export default function ModuleShell({
 
               {onReset && (
                 <button
-                  onClick={() => { if (window.confirm(lang === 'bn' ? 'রিসেট করবেন?' : 'Reset form?')) onReset(); }}
+                  onClick={() => {
+                    if (!isDirty || window.confirm(lang === 'bn' ? 'রিসেট করবেন?' : 'Reset form?')) onReset();
+                  }}
                   aria-label={lang === 'bn' ? 'ফর্ম রিসেট করুন' : 'Reset form'}
                   style={actionBtn('transparent', T.btnDangerText, T.btnDangerBorder)}
                   onFocus={e => e.currentTarget.style.boxShadow = `0 0 0 3px ${T.danger.dot}33`}

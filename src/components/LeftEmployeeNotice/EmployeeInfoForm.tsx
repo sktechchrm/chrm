@@ -19,7 +19,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useForm, Controller }       from 'react-hook-form';
 import { zodResolver }               from '@hookform/resolvers/zod';
 import { z }                         from 'zod';
-import type { Address, Employee }    from '../../types/LeftNoticeDataType';
+import type { Address, Employee }    from './LeftNoticeDataType';
 import { FormField, Input, Select, CheckboxField } from '../common/FormField';
 
 // ── Zod schema ────────────────────────────────────────────────────────────────

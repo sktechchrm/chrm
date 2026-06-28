@@ -1,5 +1,5 @@
 import React from 'react';
-import { Employee, formatDateBengali, toBanglaNumber } from '../../types/LeftNoticeDataType';
+import { Employee, formatDateBengali, toBanglaNumber } from './LeftNoticeDataType';
 import { PrintSignatureRow } from '../common/AuthorizationBlock';
 import type { AuthorizationState } from '../common/AuthorizationBlock';
 import { BASE_PRINT_CSS, PAGE_A4_PORTRAIT } from '../../utils/printCSS';

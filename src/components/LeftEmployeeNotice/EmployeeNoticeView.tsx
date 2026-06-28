@@ -31,7 +31,7 @@ import { toDateInput }               from '../../utils/dateUtils';
 import ModuleShell                   from '../shell/ModuleShell';
 import { DEFAULT_AUTHORIZATION }     from '../common/AuthorizationBlock';
 import type { AuthorizationState }   from '../common/AuthorizationBlock';
-import { Employee, initialEmployee, toBanglaNumber } from '../../types/LeftNoticeDataType';
+import { Employee, initialEmployee, toBanglaNumber } from './LeftNoticeDataType';
 import { EmployeeForm }              from './EmployeeInfoForm';
 import { NoticeLetter }              from './EmployeeNotice';
 import { Envelope }                  from './Envelope';

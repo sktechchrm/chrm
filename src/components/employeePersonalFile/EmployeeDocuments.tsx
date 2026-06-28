@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { FaUser } from 'react-icons/fa';
-import { EmployeeFormData, AgeData } from '../../types/employee.types';
+import { EmployeeFormData, AgeData } from './employee.types';
 
 // Utility Functions
 export const calculateAge = (dob: string): AgeData => {

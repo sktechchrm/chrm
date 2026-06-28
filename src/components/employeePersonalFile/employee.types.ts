@@ -1,4 +1,4 @@
-import { FACTORY_NAME_EN, FACTORY_REGISTRY } from '../factories/FactoryRegistry';
+import { FACTORY_NAME_EN, FACTORY_REGISTRY } from '../../factories/FactoryRegistry';
 // employee.types.ts (Optimized & Standard)
 
 // ============= INTERFACES =============

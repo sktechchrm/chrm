@@ -11,7 +11,7 @@ import type { ChangeEvent }  from 'react';
 import { FormField, Input, Select, Textarea } from '../common/FormField';
 import {
   EmployeeFormData, EducationEntry, PreviousJobEntry, generateEntryId,
-} from '../../types/employee.types';
+} from './employee.types';
 
 // ── Zod schemas ───────────────────────────────────────────────────────────────
 

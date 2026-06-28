@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { FaUser } from 'react-icons/fa';
-import { EmployeeFormData } from '../../../types/employee.types';
+import { EmployeeFormData } from '../employee.types';
 
 interface DocumentProps {
   formData: EmployeeFormData;

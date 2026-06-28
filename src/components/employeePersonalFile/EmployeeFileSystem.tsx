@@ -36,7 +36,7 @@ import ModuleShell from '../shell/ModuleShell';
 import { DEFAULT_AUTHORIZATION } from '../common/AuthorizationBlock';
 import type { AuthorizationState } from '../common/AuthorizationBlock';
 import { BASE_PRINT_CSS, PAGE_A4_PORTRAIT } from '../../utils/printCSS';
-import { EmployeeFormData, initialFormData } from '../../types/employee.types';
+import { EmployeeFormData, initialFormData } from './employee.types';
 import EmployeeForm, { type FormStepId } from './EmployeeForm';
 import AppointmentLetter from './PrintFiles/AppointmentLetter';
 import NomineeForm from './PrintFiles/NomineeForm';

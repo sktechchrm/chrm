@@ -1,7 +1,7 @@
 // LeftWorkerNotice.tsx
 
 import React from 'react';
-import { EmployeeFormData } from '../../../types/employee.types';
+import { EmployeeFormData } from '../employee.types';
 
 interface DocumentProps {
   formData: EmployeeFormData;

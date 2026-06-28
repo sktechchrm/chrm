@@ -218,8 +218,6 @@ export default function IncrementFormComponent({ increment, setIncrement }: Incr
             </tbody>
           </table>
         </div>
-
-
       </div>
     </div>
   );

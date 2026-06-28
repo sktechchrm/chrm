@@ -1,6 +1,6 @@
 import { FACTORY_NAME_EN, FACTORY_ADDRESS_EN } from '../../../config/factory';
 import React, { useState } from 'react';
-import { EmployeeFormData, AgeData, DocumentProps } from '../../../types/employee.types';
+import { EmployeeFormData, AgeData, DocumentProps } from '../employee.types';
 
 const calculateAge = (dob: string): AgeData => {
   if (!dob) return { years: 0, months: 0, days: 0 };

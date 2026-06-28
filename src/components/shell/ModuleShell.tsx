@@ -841,15 +841,6 @@ export default function ModuleShell({
                     <span style={{ fontSize: 12, fontWeight: isActive ? 500 : 400, flex: 1, lineHeight: 1.3 }}>
                       {step.label}
                     </span>
-                    {step.fieldCount !== undefined && (
-                      <span style={{
-                        fontSize: 10, padding: '1px 6px', borderRadius: 10,
-                        background: isActive ? 'rgba(255,255,255,.18)' : 'rgba(255,255,255,.08)',
-                        color: isActive ? '#fff' : 'rgba(255,255,255,.4)',
-                      }}>
-                        {step.fieldCount}
-                      </span>
-                    )}
                     {isDone && !isActive && (
                       <span aria-label="সম্পন্ন" style={{ fontSize: 11, color: T.sidebarDone }}>✓</span>
                     )}

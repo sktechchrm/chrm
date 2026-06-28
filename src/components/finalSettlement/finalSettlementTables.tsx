@@ -290,14 +290,16 @@ export const EmployeeInfoTable: React.FC<TableProps> = ({ formData, handleChange
         ].map(item => (
           <tr className="fst-row" key={item.name}>
             <td className="fst-label">
-              <div className="fst-label-inner"><Bar color="#22c55e" />{item.label}</div>
+              <label htmlFor={`fs-${item.name}`} className="fst-label-inner" style={{cursor:'pointer'}}><Bar color="#22c55e" />{item.label}</label>
             </td>
             <td className="fst-value">
               <input
+                id={`fs-${item.name}`}
                 className="fst-input"
                 name={item.name}
                 value={formData[item.name as keyof EmployeeFormData] as string}
                 onChange={handleChange}
+                aria-required={['employeeName','cardNo','designation'].includes(item.name) ? true : undefined}
               />
             </td>
           </tr>
@@ -323,17 +325,20 @@ export const EmployeeInfoTable: React.FC<TableProps> = ({ formData, handleChange
                 <div className="fst-label-inner"><Bar color="#22c55e" />{item.label}</div>
               </td>
               <td className="fst-value">
-                <div className="fst-date-group">
-                  <input className="fst-input fst-input-center" type="number" min="1" max="31"
-                    value={day} placeholder="দিন"
-                    onChange={e => e.target.value && fire(e.target.value, month, year)} />
-                  <input className="fst-input fst-input-center" type="number" min="1" max="12"
-                    value={month} placeholder="মাস"
-                    onChange={e => e.target.value && fire(day, e.target.value, year)} />
-                  <input className="fst-input fst-input-center" type="number" min="1900" max="2100"
-                    value={year} placeholder="বছর" style={{ flex: 1.5 }}
-                    onChange={e => e.target.value && fire(day, month, e.target.value)} />
-                </div>
+                <fieldset style={{border:'none',padding:0,margin:0}}>
+                  <legend style={{display:'none'}}>{item.label}</legend>
+                  <div className="fst-date-group">
+                    <input className="fst-input fst-input-center" type="number" min="1" max="31"
+                      value={day} placeholder="দিন" aria-label={`${item.label} — দিন`}
+                      onChange={e => e.target.value && fire(e.target.value, month, year)} />
+                    <input className="fst-input fst-input-center" type="number" min="1" max="12"
+                      value={month} placeholder="মাস" aria-label={`${item.label} — মাস`}
+                      onChange={e => e.target.value && fire(day, e.target.value, year)} />
+                    <input className="fst-input fst-input-center" type="number" min="1900" max="2100"
+                      value={year} placeholder="বছর" style={{ flex: 1.5 }} aria-label={`${item.label} — বছর`}
+                      onChange={e => e.target.value && fire(day, month, e.target.value)} />
+                  </div>
+                </fieldset>
               </td>
             </tr>
           );
@@ -342,10 +347,10 @@ export const EmployeeInfoTable: React.FC<TableProps> = ({ formData, handleChange
         {/* Termination type */}
         <tr>
           <td className="fst-label">
-            <div className="fst-label-inner"><Bar color="#22c55e" />চাকরি নিষ্পত্তির ধরন</div>
+            <label htmlFor="fs-terminationType" className="fst-label-inner" style={{cursor:'pointer'}}><Bar color="#22c55e" />চাকরি নিষ্পত্তির ধরন</label>
           </td>
           <td className="fst-value">
-            <select className="fst-select" name="terminationType" value={formData.terminationType} onChange={handleChange}>
+            <select id="fs-terminationType" className="fst-select" name="terminationType" aria-required={true} value={formData.terminationType} onChange={handleChange}>
               <option value="">-- নির্বাচন করুন --</option>
               <option value="ইস্তফা (২৭)">ইস্তফা (২৭)</option>
               <option value="অনুপস্থিতির কারণে ইস্তফা (২৭)">অনুপস্থিতির কারণে ইস্তফা (২৭)</option>
@@ -406,9 +411,9 @@ export const ServiceDurationTable: React.FC<TableProps> = ({ formData, handleCha
       </div>
       <div className="fst-absent-box">
         <div className="fst-absent-box-label"><Dot color="#6366f1" />অসম্পূর্ণ বছরে অনুপস্থিতির দিন সমূহ</div>
-        <input name="absentDays" value={formData.absentDays} onChange={handleChange}
+        <input id="fs-absentDays" name="absentDays" value={formData.absentDays} onChange={handleChange}
           className="fst-input fst-input-mono"
-          style={{ borderColor: '#93c5fd' }} />
+          style={{ borderColor: '#93c5fd' }} aria-label="অনুপস্থিত দিন সংখ্যা" />
       </div>
     </div>
   </div>
@@ -434,7 +439,7 @@ export const WageTable: React.FC<TableProps> = ({ formData, handleChange }) => (
             <td className="fst-value">
               <input className="fst-input fst-input-mono"
                 style={{ borderColor: '#fbbf24', fontSize: 16 }}
-                name="totalMonthlyWage" value={formData.totalMonthlyWage} onChange={handleChange} />
+                id="fs-totalMonthlyWage" name="totalMonthlyWage" value={formData.totalMonthlyWage} onChange={handleChange} aria-required={true} />
             </td>
             <td className="fst-unit">টাকা</td>
           </tr>
@@ -612,7 +617,7 @@ export const CalculationTable: React.FC<CalculationTableProps> = ({
             <>
             <tr className="fst-toggle-row">
               <td colSpan={3}>
-                <div className="fst-toggle-inner">
+                <div className="fst-toggle-inner" role="group" aria-label="পেমেন্ট পদ্ধতি নির্বাচন করুন">
                   <span style={{ fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
                     <Bar color="#a855f7" />পেমেন্ট পদ্ধতি:
                   </span>

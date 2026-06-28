@@ -8,7 +8,7 @@ import {
   EmployeeFormData,
   getAppointmentConditions,
   AppointmentCondition,
-} from '../../../types/employee.types';
+} from '../employee.types';
 
 interface Props { formData: EmployeeFormData; }
 
